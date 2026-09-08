@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "packages": {
+    "peripheral-discovery": {
+      "versions": {
+        "1.0.0": {
+          "manifest": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/peripheral-discovery/1.0.0.json"
+        }
+      }
+    },
+    "networking": {
+      "versions": {
+        "1.0.0": {
+          "manifest": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/networking/1.0.0.json"
+        }
+      }
+    }
+  }
+}
