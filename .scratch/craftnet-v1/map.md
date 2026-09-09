@@ -29,11 +29,12 @@ An implementation-ready specification and ordered delivery plan for CraftNet v1:
 - [Prototype operations and player controls](issues/12-prototype-operations-and-player-controls.md): the dashboard centers on a topology canvas with linked Traffic and Incidents views, provides a confirmed Customer Network enable/disable action, hides secret values, and leaves in-game screens deliberately terse.
 - [Specify wire schemas and errors](issues/16-specify-wire-schemas-and-errors.md): versioned bounded JSON messages use a cross-language canonical form, authenticated relationship sessions, explicit body schemas, stable error codes, opaque scoped identities, Ed25519 two-minute Access Tokens, and separate raw-modem and Gateway limits without fragmentation.
 - [Design package and extension boundaries](issues/13-design-package-and-extension-boundaries.md): three deep Lua packages hide protocol, domain, and runtime complexity beneath four role composition roots, while one Go binary separates Gateway, identity, operations, projections, storage, and web adapters around explicit test seams.
+- [Define verification and reference topology](issues/14-define-verification-and-reference-topology.md): shared fixtures, deterministic Lua simulation, Go and Gateway tests, and a scripted Home/Farm in-world run prove overlapping addresses, routing/NAT, external ancestry, dashboard control, recovery, protocol limits, and a 1,685-entity tested scale.
+- [Order delivery and release gates](issues/15-order-delivery-and-release-gates.md): eight gated milestones progress from reproducible protocol fixtures through pure Lua authority, runtime, local and provider vertical slices, the Go Gateway, dashboard operations, and a fully evidenced v0.1.0 release.
 
 ## Not yet specified
 
-- Executable acceptance scenarios, reference-topology fixtures, and capacity gates, pending the verification ticket.
-- Implementation order, milestone boundaries, and release gates, pending the delivery-plan ticket.
+- Nothing required for the CraftNet v1 implementation plan. New scope requires a new decision ticket.
 
 ## Out of scope
 
