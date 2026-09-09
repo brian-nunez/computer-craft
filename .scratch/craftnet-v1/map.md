@@ -24,12 +24,16 @@ An implementation-ready specification and ordered delivery plan for CraftNet v1:
 - [Prototype routing and NAT contract](issues/07-prototype-routing-and-nat-contract.md): local requests stay behind the Customer Router, while remote requests use scoped destinations, explicit Exposed Services, and paired ephemeral NAT Flows routed through ISP and Central Server maps with distinct failure outcomes.
 - [Define ISP registration and interconnection](issues/08-define-isp-registration-and-interconnection.md): the Central Server delegates non-overlapping RFC 6598 allocations to authenticated ISPs, accepts exact Customer Network route registrations through them, and remains the sole path for same-ISP and cross-ISP traffic.
 - [Define external gateway contract](issues/09-define-external-gateway-contract.md): one authenticated outbound WebSocket per World carries named External Operations, verified ancestry, topology, traffic telemetry, and idempotent administrative commands; disconnects fail requests without disrupting internal networking.
-- [Choose external runtime and storage](issues/10-choose-external-runtime-and-storage.md): a single Node.js 24 TypeScript/Fastify application serves WebSocket, API, authentication, dashboard, and static assets using file-backed SQLite through `better-sqlite3`, with no distributed infrastructure in v1.
+- [Choose external runtime and storage](issues/10-choose-external-runtime-and-storage.md): a single Go 1.27 application serves WebSocket, HTTP interfaces, authentication, dashboard, and embedded assets using file-backed SQLite through `database/sql` and a CGo-free adapter, with no distributed infrastructure in v1.
+- [Define failures, persistence, and recovery](issues/11-define-failures-persistence-and-recovery.md): versioned atomic snapshots preserve authoritative CraftOS state, revisions reconcile parent-child configuration, live flows fail rather than resume, reconnects rebuild sessions, and explicit failure outcomes feed bounded local buffers plus 30-day external history.
+- [Prototype operations and player controls](issues/12-prototype-operations-and-player-controls.md): the dashboard centers on a topology canvas with linked Traffic and Incidents views, provides a confirmed Customer Network enable/disable action, hides secret values, and leaves in-game screens deliberately terse.
+- [Specify wire schemas and errors](issues/16-specify-wire-schemas-and-errors.md): versioned bounded JSON messages use a cross-language canonical form, authenticated relationship sessions, explicit body schemas, stable error codes, opaque scoped identities, Ed25519 two-minute Access Tokens, and separate raw-modem and Gateway limits without fragmentation.
+- [Design package and extension boundaries](issues/13-design-package-and-extension-boundaries.md): three deep Lua packages hide protocol, domain, and runtime complexity beneath four role composition roots, while one Go binary separates Gateway, identity, operations, projections, storage, and web adapters around explicit test seams.
 
 ## Not yet specified
 
-- Detailed dashboard visual design, pending the control-surface and telemetry decisions.
-- Capacity targets and performance limits, pending the state and transport models.
+- Executable acceptance scenarios, reference-topology fixtures, and capacity gates, pending the verification ticket.
+- Implementation order, milestone boundaries, and release gates, pending the delivery-plan ticket.
 
 ## Out of scope
 

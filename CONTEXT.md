@@ -64,6 +64,10 @@ _Avoid_: Router, client node
 The Central Server's authoritative enabled or disabled state for a Customer Network, independent of whether that network is currently reachable.
 _Avoid_: Online status, dashboard state
 
+**Connectivity State**:
+The current observed ability of a CraftNet role to communicate with its parent, reported as connecting, ready, degraded, disconnected, or revoked.
+_Avoid_: Network Status, enabled state
+
 **Traffic Event**:
 A metadata record describing an attempted CraftNet communication without including its payload body.
 _Avoid_: Packet capture, message
