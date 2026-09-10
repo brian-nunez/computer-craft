@@ -80,6 +80,7 @@ function Router:installListener()
     transport = self.transport,
     clock = self.clock,
     engine = self.runtime.engine,
+    submit = function(input) return self.runtime:submit(input) end,
     password = password,
     router_id = state.router_id,
     display_name = state.customer_network_name,

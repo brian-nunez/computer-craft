@@ -241,6 +241,22 @@ function Central:setNetworkStatus(customerNetworkId, status, commandId)
   return outcome.result
 end
 
+-- receiveGateway is what a Gateway adapter calls when a frame arrives from the
+-- External Application. The adapter owns the wire; this owns what the frame
+-- means, and the engine owns what it does. An Operator's decision made in the
+-- dashboard reaches authoritative state through exactly this path.
+function Central:receiveGateway(frameKind, body, correlation)
+  correlation = correlation or {}
+  local outcome = self.runtime:submit({
+    kind = "gateway_frame",
+    frame_kind = frameKind,
+    body = body,
+    command_id = correlation.command_id,
+    request_id = correlation.request_id,
+  })
+  return outcome.result
+end
+
 -- topology is the projection the External Application receives. It is a view of
 -- authoritative state, never an authority, and it carries no secret value.
 function Central:topology()

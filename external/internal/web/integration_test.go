@@ -2,7 +2,6 @@ package web_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -753,16 +752,11 @@ func TestACommandForAnAbsentWorldIsRetained(t *testing.T) {
 func TestWorldsAreListedWithTheirPresence(t *testing.T) {
 	held := newHarness(t)
 
+	// The listing is behind the dashboard's session, like everything else
+	// under /api.
+	view := held.signedIn()
 	read := func() map[string]any {
-		response, err := http.Get(held.server.URL + "/api/worlds")
-		if err != nil {
-			t.Fatalf("get: %v", err)
-		}
-		defer response.Body.Close()
-		var body map[string]any
-		if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		_, body := view.get("/api/worlds")
 		return body
 	}
 

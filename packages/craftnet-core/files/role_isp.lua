@@ -402,6 +402,27 @@ function messages.dns_result(engine, link, message, now, out)
   return relay(engine, link, message, now, out, "dns_result")
 end
 
+-- topology_change is a Customer Router telling the World about one of its
+-- Computers. An ISP summarises its children's telemetry upward; it does not own
+-- any of it, so the message passes through unchanged.
+function messages.topology_change(engine, link, message, now, out)
+  local router = engine.state.routers[link.id]
+  if link.role ~= "router" or not router then
+    return out:fail("forbidden_operation", "only a registered Customer Router may report here")
+  end
+  local entity = get(message.body, "entity")
+  if get(entity, "customer_network_id") ~= router.customer_network_id then
+    return out:fail("forbidden_operation",
+      "a Customer Router may only report its own Customer Network")
+  end
+  if not engine.parentRelationshipId then
+    return out:fail("upstream_unavailable", "this ISP has no connection to the Central Server")
+  end
+  out:send(engine.parentRelationshipId, "topology_change", message.body,
+    engine:allocateRequestId())
+  out:ok({ forwarded = "up" })
+end
+
 function messages.error(engine, link, message, now, out)
   return relay(engine, link, message, now, out, "error")
 end

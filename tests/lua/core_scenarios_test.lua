@@ -395,3 +395,150 @@ test("scenario 7: an administrative command is idempotent by Command ID", functi
   }), "repeat")
   assertTrue(again.repeated, "the repeat returned the already-applied result")
 end)
+
+--------------------------------------------------------------------------
+-- Scenario 10 -- administration arriving over the Gateway
+--------------------------------------------------------------------------
+
+-- An Operator's decision is made in the dashboard and applied here. The
+-- External Application never edits a World: it asks, and the Central Server
+-- answers on its own authoritative state.
+
+local function gatewayFrames(sim, nodeName)
+  local frames = {}
+  for _, effect in ipairs(sim:node(nodeName).outbox) do
+    if effect.kind == "gateway" then frames[#frames + 1] = effect end
+  end
+  return frames
+end
+
+local function lastGatewayFrame(sim, nodeName)
+  local frames = gatewayFrames(sim, nodeName)
+  return frames[#frames]
+end
+
+local function adminCommand(commandId, body)
+  return {
+    kind = "gateway_frame",
+    frame_kind = "admin_command",
+    command_id = commandId,
+    request_id = commandId,
+    body = core.object(body),
+  }
+end
+
+test("scenario 10: an administrative command from the Gateway disables a Customer Network", function()
+  local sim = build()
+  sim:reset()
+
+  local outcome = reference.assertOk(sim:input("central", adminCommand("cmd-0011", {
+    action = "set_network_status",
+    customer_network_id = "network-farm",
+    status = "disabled",
+  })), "disable farm from the dashboard")
+  assertEqual(outcome.status, "disabled", "the status it applied")
+  assertTrue(not outcome.repeated, "the first application is not a repeat")
+
+  local frame = lastGatewayFrame(sim, "central")
+  assertTrue(frame ~= nil, "the Central Server answered the command")
+  assertEqual(frame.message_kind, "command_result", "answer kind")
+  assertEqual(frame.command_id, "cmd-0011", "the answer carries the Command ID")
+  assertEqual(get(frame.body, "status"), "applied", "answer status")
+  local ok, problem = protocol.conformance.schema.validateBody("command_result", frame.body)
+  assertTrue(ok, "the answer is a valid command_result: " .. tostring(problem))
+
+  -- And the World really is disabled: new Farm traffic is refused.
+  sim:input("alex-pc", {
+    kind = "local_request",
+    destination = { customer_network_id = "network-farm", computer_id = "computer-farm-harvester" },
+    service = "harvester.status",
+    payload = core.object({}),
+  })
+  assertEqual(sim:lastResultAt("alex-pc", "error").code, "network_disabled", "new Farm traffic")
+end)
+
+test("scenario 10: repeating a Command ID from the Gateway is harmless", function()
+  local sim = build()
+  reference.assertOk(sim:input("central", adminCommand("cmd-0012", {
+    action = "set_network_status",
+    customer_network_id = "network-farm",
+    status = "disabled",
+  })), "disable")
+
+  sim:reset()
+  local again = reference.assertOk(sim:input("central", adminCommand("cmd-0012", {
+    action = "set_network_status",
+    customer_network_id = "network-farm",
+    status = "disabled",
+  })), "the same command again")
+  assertTrue(again.repeated, "the repeat returned the already-applied result")
+
+  -- It is still answered, so the External Application stops resending it.
+  local frame = lastGatewayFrame(sim, "central")
+  assertEqual(get(frame.body, "status"), "applied", "a repeat is still applied")
+end)
+
+test("scenario 10: re-enabling over the Gateway needs no re-enrollment", function()
+  local sim = build()
+  reference.assertOk(sim:input("central", adminCommand("cmd-0013", {
+    action = "set_network_status",
+    customer_network_id = "network-farm",
+    status = "disabled",
+  })), "disable")
+  reference.assertOk(sim:input("central", adminCommand("cmd-0014", {
+    action = "set_network_status",
+    customer_network_id = "network-farm",
+    status = "enabled",
+  })), "re-enable")
+
+  -- The durable registrations were never touched, so traffic simply resumes.
+  assertEqual(bindingOf(sim, "router-farm", "computer-farm-harvester").address, "192.168.1.20",
+    "the binding survived")
+  sim:reset()
+  sim:input("alex-pc", {
+    kind = "local_request",
+    destination = { customer_network_id = "network-farm", computer_id = "computer-farm-harvester" },
+    service = "harvester.status",
+    payload = core.object({}),
+  })
+  local recovered = sim:lastResultAt("alex-pc", "service_response")
+  assertTrue(recovered and recovered.ok, "traffic resumed")
+end)
+
+test("scenario 10: a command for an unknown Customer Network is refused out loud", function()
+  local sim = build()
+  sim:reset()
+  local outcome = sim:input("central", adminCommand("cmd-0015", {
+    action = "set_network_status",
+    customer_network_id = "network-nowhere",
+    status = "disabled",
+  }))
+  assertTrue(not outcome.result.ok, "it was refused")
+  assertEqual(outcome.result.code, "route_not_found", "code")
+
+  -- A command with no answer is one the External Application resends forever.
+  local frame = lastGatewayFrame(sim, "central")
+  assertTrue(frame ~= nil, "the refusal was still answered")
+  assertEqual(get(frame.body, "status"), "rejected", "answer status")
+  local ok, problem = protocol.conformance.schema.validateBody("command_result", frame.body)
+  assertTrue(ok, "a rejection is a valid command_result: " .. tostring(problem))
+end)
+
+test("scenario 10: the Gateway carries only administrative commands inward", function()
+  local sim = build()
+  sim:reset()
+  local outcome = sim:input("central", {
+    kind = "gateway_frame",
+    frame_kind = "admin_command",
+    command_id = "cmd-0016",
+    body = core.object({ action = "delete_everything" }),
+  })
+  assertTrue(not outcome.result.ok, "an unknown action is refused")
+  assertEqual(outcome.result.code, "forbidden_operation", "code")
+
+  local refused = sim:input("central", {
+    kind = "gateway_frame", frame_kind = "external_response", body = core.object({}),
+  })
+  assertTrue(not refused.result.ok, "nothing else arrives inward in v1")
+  assertEqual(refused.result.code, "forbidden_operation", "code")
+end)

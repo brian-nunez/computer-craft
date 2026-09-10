@@ -159,6 +159,23 @@ var migrations = []string{
 		recorded_at INTEGER NOT NULL
 	);`,
 	`CREATE INDEX IF NOT EXISTS audit_by_time ON audit (world_id, recorded_at);`,
+
+	`CREATE TABLE IF NOT EXISTS operators (
+		name TEXT PRIMARY KEY,
+		salt TEXT NOT NULL,
+		password_sha TEXT NOT NULL,
+		iterations INTEGER NOT NULL,
+		created_at INTEGER NOT NULL,
+		disabled_at INTEGER
+	);`,
+
+	`CREATE TABLE IF NOT EXISTS sessions (
+		token_sha TEXT PRIMARY KEY,
+		operator TEXT NOT NULL,
+		issued_at INTEGER NOT NULL,
+		expires_at INTEGER NOT NULL
+	);`,
+	`CREATE INDEX IF NOT EXISTS sessions_by_expiry ON sessions (expires_at);`,
 }
 
 // SchemaVersion is what a fully migrated database reports.
@@ -616,4 +633,97 @@ func (t *tx) Audit(worldID string, limit int) ([]store.AuditRecord, error) {
 		found[left], found[right] = found[right], found[left]
 	}
 	return found, nil
+}
+
+//--------------------------------------------------------------------------
+// Operators and sessions
+//--------------------------------------------------------------------------
+
+func (t *tx) PutOperator(operator store.Operator) error {
+	_, err := t.tx.ExecContext(t.ctx, `
+		INSERT INTO operators (name, salt, password_sha, iterations, created_at, disabled_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(name) DO UPDATE SET
+			salt = excluded.salt, password_sha = excluded.password_sha,
+			iterations = excluded.iterations, disabled_at = excluded.disabled_at`,
+		operator.Name, operator.Salt, operator.PasswordSHA, operator.Iterations,
+		stamp(operator.CreatedAt), optional(operator.DisabledAt))
+	return err
+}
+
+const operatorColumns = `name, salt, password_sha, iterations, created_at, disabled_at`
+
+func scanOperator(row interface{ Scan(...any) error }) (store.Operator, error) {
+	var operator store.Operator
+	var created int64
+	var disabled sql.NullInt64
+	err := row.Scan(&operator.Name, &operator.Salt, &operator.PasswordSHA,
+		&operator.Iterations, &created, &disabled)
+	if err != nil {
+		return store.Operator{}, translate(err)
+	}
+	operator.CreatedAt = moment(created)
+	operator.DisabledAt = readOptional(disabled)
+	return operator, nil
+}
+
+func (t *tx) Operator(name string) (store.Operator, error) {
+	return scanOperator(t.tx.QueryRowContext(t.ctx,
+		`SELECT `+operatorColumns+` FROM operators WHERE name = ?`, name))
+}
+
+func (t *tx) Operators() ([]store.Operator, error) {
+	rows, err := t.tx.QueryContext(t.ctx,
+		`SELECT `+operatorColumns+` FROM operators ORDER BY name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	found := make([]store.Operator, 0)
+	for rows.Next() {
+		operator, err := scanOperator(rows)
+		if err != nil {
+			return nil, err
+		}
+		found = append(found, operator)
+	}
+	return found, rows.Err()
+}
+
+func (t *tx) PutSession(session store.Session) error {
+	_, err := t.tx.ExecContext(t.ctx, `
+		INSERT INTO sessions (token_sha, operator, issued_at, expires_at)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(token_sha) DO UPDATE SET expires_at = excluded.expires_at`,
+		session.TokenSHA, session.Operator, stamp(session.IssuedAt), stamp(session.ExpiresAt))
+	return err
+}
+
+func (t *tx) Session(tokenSHA string) (store.Session, error) {
+	var session store.Session
+	var issued, expires int64
+	row := t.tx.QueryRowContext(t.ctx,
+		`SELECT token_sha, operator, issued_at, expires_at FROM sessions WHERE token_sha = ?`,
+		tokenSHA)
+	if err := row.Scan(&session.TokenSHA, &session.Operator, &issued, &expires); err != nil {
+		return store.Session{}, translate(err)
+	}
+	session.IssuedAt = moment(issued)
+	session.ExpiresAt = moment(expires)
+	return session, nil
+}
+
+func (t *tx) DeleteSession(tokenSHA string) error {
+	_, err := t.tx.ExecContext(t.ctx, `DELETE FROM sessions WHERE token_sha = ?`, tokenSHA)
+	return err
+}
+
+func (t *tx) PruneSessions(before time.Time) (int64, error) {
+	result, err := t.tx.ExecContext(t.ctx,
+		`DELETE FROM sessions WHERE expires_at < ?`, stamp(before))
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
