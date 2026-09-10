@@ -138,6 +138,22 @@ func writeMessages() {
 			"source_flow_id": "flow-a1", "destination_flow_id": "flow-b2"}},
 		{"service_response", "operational", "service_response", protocol.Object{
 			"payload": protocol.Object{"items": protocol.Array{}}, "source_flow_id": "flow-a1"}},
+		{"external_call for an ordinary operation", "operational", "external_call", protocol.Object{
+			"source":       sampleSource(),
+			"operation":    "market.quote",
+			"access_token": "opaque.bearer.token",
+			"payload":      protocol.Object{"symbol": "wheat"}}},
+		{"external_call registering a device", "operational", "external_call", protocol.Object{
+			"source":             sampleSource(),
+			"operation":          "device.register",
+			"registration_nonce": fixtureClientNonce,
+			"payload":            protocol.Object{}}},
+		{"external_call issuing a token, natted", "operational", "external_call", protocol.Object{
+			"source":            sampleSource(),
+			"operation":         "token.issue",
+			"device_credential": "opaque-device-credential",
+			"source_flow_id":    "flow-a3",
+			"payload":           protocol.Object{}}},
 		{"error with details", "operational", "error", protocol.Object{
 			"code": "route_not_found", "message": "That network is not reachable right now.",
 			"retryable": false, "details": protocol.Object{"customer_network_id": "net-home"}}},
@@ -280,6 +296,15 @@ func writeMessages() {
 			protocol.CodeInvalidMessage},
 		{"device registration also presenting a token", "external_request",
 			`{"ancestry":{"world_id":"world-o","isp_id":"isp-a","customer_network_id":"net-farm","router_id":"rtr-farm","computer_id":"cmp-h","local_address":"192.168.1.20"},"source_flow_id":"flow-a","operation":"device.register","registration_nonce":"` + fixtureClientNonce + `","access_token":"t","payload":{}}`,
+			protocol.CodeInvalidMessage},
+		{"an external call naming a destination", "external_call",
+			`{"source":{"computer_id":"cmp-h","customer_network_id":"net-farm","local_address":"192.168.1.20"},"destination":{"customer_network_id":"net-home","computer_id":"cmp-k"},"operation":"market.quote","access_token":"t","payload":{}}`,
+			protocol.CodeInvalidMessage},
+		{"an external call with no credential at all", "external_call",
+			`{"source":{"computer_id":"cmp-h","customer_network_id":"net-farm","local_address":"192.168.1.20"},"operation":"market.quote","payload":{}}`,
+			protocol.CodeInvalidMessage},
+		{"an external call registering a device with a token", "external_call",
+			`{"source":{"computer_id":"cmp-h","customer_network_id":"net-farm","local_address":"192.168.1.20"},"operation":"device.register","registration_nonce":"` + fixtureClientNonce + `","access_token":"t","payload":{}}`,
 			protocol.CodeInvalidMessage},
 		{"ordinary operation presenting a device credential", "external_request",
 			`{"ancestry":{"world_id":"world-o","isp_id":"isp-a","customer_network_id":"net-farm","router_id":"rtr-farm","computer_id":"cmp-h","local_address":"192.168.1.20"},"source_flow_id":"flow-a","operation":"market.quote","device_credential":"c","payload":{}}`,

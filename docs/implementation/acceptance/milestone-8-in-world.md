@@ -130,12 +130,20 @@ From `alex-pc`:
 - [ ] A WebSocket to `/gateway` with no Gateway Credential is refused.
 - [ ] A WebSocket to `/gateway` with a browser `Origin` is refused.
 
-> **This scenario cannot be run yet.** The in-world Gateway transport is not
-> built — see [Milestone 7's deferrals](../milestone-7.md#deliberately-deferred).
-> Everything from the Gateway inward is covered by the Go suite; everything from
-> the Computer to the Central Server is covered by the Lua suite. What is
-> missing is the leg between the Central Server and `craftnetd`. Record this
-> scenario as **blocked**, not as passed or failed.
+From a Computer, the whole of it is:
+
+```
+craftnet call api.craft test.identity
+```
+
+Registering and getting a token happen underneath, on first use.
+
+> **This scenario became runnable in [Milestone
+> 9](../milestone-9.md).** The Central Server now holds a real
+> `http.websocket` session to `craftnetd`. It has still never been run against
+> the real Go process in the target stack — that is what this checklist is for.
+> The Computer needs CC:Tweaked's HTTP API enabled and the External
+> Application's host allowed; see [the setup guide](../../operations/setup.md).
 
 ## 9. Observe operations
 

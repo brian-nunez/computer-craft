@@ -143,6 +143,9 @@ an External Operation on the in-world wire is a protocol decision the tickets do
 not settle, and the transport belongs with it. Improvising one at a release gate
 would be the worst possible moment to decide it.
 
+> Both were done in [Milestone 9](milestone-9.md), which exists for exactly
+> this reason. Scenario 8 is no longer blocked.
+
 **No in-world run has been performed**, so the twelve scenarios stand unrun in
 the target stack, as do the Milestone 4, 5, and 7 checklists.
 

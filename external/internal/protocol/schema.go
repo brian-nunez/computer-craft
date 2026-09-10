@@ -321,6 +321,30 @@ var assignments = map[string]shape{
 	"central": configurations["central"],
 }
 
+// validateCredentialUse fixes which credential an operation may present.
+// device.register offers the authenticated ancestry as its only attestation;
+// every other combination is rejected rather than quietly preferred. The rule
+// lives here because both legs of the external path enforce it: the in-world
+// external_call a Computer sends, and the external_request the Central Server
+// puts on the Gateway.
+func validateCredentialUse(value Object) (string, string) {
+	operation, _ := stringValue(value["operation"])
+	_, hasToken := value["access_token"]
+	_, hasCredential := value["device_credential"]
+	_, hasNonce := value["registration_nonce"]
+	wantToken, wantCredential, wantNonce := true, false, false
+	switch operation {
+	case "device.register":
+		wantToken, wantCredential, wantNonce = false, false, true
+	case "token.issue", "device.rotate":
+		wantToken, wantCredential, wantNonce = false, true, false
+	}
+	if hasToken != wantToken || hasCredential != wantCredential || hasNonce != wantNonce {
+		return fmt.Sprintf("operation %q does not permit this credential combination", operation), ""
+	}
+	return "", ""
+}
+
 var bodies = map[string]shape{
 	"discover": {required: map[string]string{"role": "role", "client_nonce": "nonce"}},
 	"offer": {required: map[string]string{
@@ -393,6 +417,22 @@ var bodies = map[string]shape{
 		required: map[string]string{"payload": "object"},
 		optional: map[string]string{"source_flow_id": "id", "destination_flow_id": "id"},
 	},
+	// external_call is how a Computer names the External Application in world.
+	// It carries no destination: a service_request destination is scoped to a
+	// Customer Network, and the External Application is not one. The kind itself
+	// is the destination. The answer comes back as an ordinary service_response,
+	// so a reply retraces its NAT Flow by exactly one rule regardless of what it
+	// answers.
+	"external_call": {
+		required: map[string]string{
+			"source": "source", "operation": "operation_name", "payload": "object",
+		},
+		optional: map[string]string{
+			"source_flow_id": "id", "access_token": "string",
+			"device_credential": "string", "registration_nonce": "nonce",
+		},
+		check: validateCredentialUse,
+	},
 	"error": composites["error_body"],
 	"topology_snapshot": {
 		required: map[string]string{
@@ -451,26 +491,7 @@ var bodies = map[string]shape{
 		optional: map[string]string{
 			"access_token": "string", "device_credential": "string", "registration_nonce": "nonce",
 		},
-		// Credential presence is fixed by the operation. device.register offers
-		// the authenticated ancestry as its only attestation; every other
-		// combination is rejected rather than quietly preferred.
-		check: func(value Object) (string, string) {
-			operation, _ := stringValue(value["operation"])
-			_, hasToken := value["access_token"]
-			_, hasCredential := value["device_credential"]
-			_, hasNonce := value["registration_nonce"]
-			wantToken, wantCredential, wantNonce := true, false, false
-			switch operation {
-			case "device.register":
-				wantToken, wantCredential, wantNonce = false, false, true
-			case "token.issue", "device.rotate":
-				wantToken, wantCredential, wantNonce = false, true, false
-			}
-			if hasToken != wantToken || hasCredential != wantCredential || hasNonce != wantNonce {
-				return fmt.Sprintf("operation %q does not permit this credential combination", operation), ""
-			}
-			return "", ""
-		},
+		check: validateCredentialUse,
 	},
 	"external_response": {required: map[string]string{"payload": "object"}},
 	"admin_command": {
@@ -514,8 +535,8 @@ var transports = map[Transport]map[string]struct{}{
 		"enroll_accept", "enroll_error", "session_open", "session_challenge", "session_confirm"),
 	TransportOperational: kindSet("heartbeat", "ack", "config_request", "config_snapshot",
 		"dns_query", "dns_result", "route_register", "route_remove", "service_request",
-		"service_response", "error", "topology_snapshot", "topology_change", "traffic_batch",
-		"network_status_set", "command_result"),
+		"service_response", "external_call", "error", "topology_snapshot", "topology_change",
+		"traffic_batch", "network_status_set", "command_result"),
 	TransportGateway: kindSet("heartbeat", "ack", "external_request", "external_response",
 		"error", "topology_snapshot", "topology_change", "traffic_batch", "admin_command",
 		"command_result"),

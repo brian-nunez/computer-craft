@@ -61,6 +61,7 @@ function adapter.new(options)
   local transport = setmetatable({
     interfaces = interfaces,
     byChannel = {},
+    observers = {},
   }, Modem)
 
   -- A channel named by an interface belongs to it. Anything else falls to the
@@ -96,6 +97,27 @@ function Modem:transmit(channel, replyChannel, text)
   return true
 end
 
+-- observe registers something else that wants CraftOS events. A Central Server
+-- holds a WebSocket as well as its modems, and CraftOS delivers both through
+-- one queue -- so an event this transport does not recognise has to be offered
+-- somewhere rather than discarded, or the Gateway would never hear anything
+-- while the role was waiting on a modem.
+--
+-- An observer answers whether the event was its own. Nothing else about it is
+-- this transport's business.
+function Modem:observe(observer)
+  assert(type(observer) == "function", "an event observer must be a function")
+  self.observers[#self.observers + 1] = observer
+  return self
+end
+
+function Modem:offer(...)
+  for _, observer in ipairs(self.observers) do
+    if observer(...) then return true end
+  end
+  return false
+end
+
 -- receive waits for one modem message on any interface, or for the timeout.
 -- Anything that is not a string is ignored rather than surfaced: a shared
 -- channel carries other programs' traffic too.
@@ -119,6 +141,10 @@ function Modem:receive(timeoutMs)
           return nil, "detached", interface.name
         end
       end
+    else
+      -- Not a modem event. Someone else may be waiting for it; the loop carries
+      -- on either way, because whatever it was is not a frame for this caller.
+      self:offer(event, first, channel, replyChannel, message)
     end
   end
 end

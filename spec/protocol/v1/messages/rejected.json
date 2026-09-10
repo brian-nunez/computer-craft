@@ -151,6 +151,24 @@
       "name": "device registration also presenting a token"
     },
     {
+      "body": "{\"source\":{\"computer_id\":\"cmp-h\",\"customer_network_id\":\"net-farm\",\"local_address\":\"192.168.1.20\"},\"destination\":{\"customer_network_id\":\"net-home\",\"computer_id\":\"cmp-k\"},\"operation\":\"market.quote\",\"access_token\":\"t\",\"payload\":{}}",
+      "error": "invalid_message",
+      "kind": "external_call",
+      "name": "an external call naming a destination"
+    },
+    {
+      "body": "{\"source\":{\"computer_id\":\"cmp-h\",\"customer_network_id\":\"net-farm\",\"local_address\":\"192.168.1.20\"},\"operation\":\"market.quote\",\"payload\":{}}",
+      "error": "invalid_message",
+      "kind": "external_call",
+      "name": "an external call with no credential at all"
+    },
+    {
+      "body": "{\"source\":{\"computer_id\":\"cmp-h\",\"customer_network_id\":\"net-farm\",\"local_address\":\"192.168.1.20\"},\"operation\":\"device.register\",\"registration_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\",\"access_token\":\"t\",\"payload\":{}}",
+      "error": "invalid_message",
+      "kind": "external_call",
+      "name": "an external call registering a device with a token"
+    },
+    {
       "body": "{\"ancestry\":{\"world_id\":\"world-o\",\"isp_id\":\"isp-a\",\"customer_network_id\":\"net-farm\",\"router_id\":\"rtr-farm\",\"computer_id\":\"cmp-h\",\"local_address\":\"192.168.1.20\"},\"source_flow_id\":\"flow-a\",\"operation\":\"market.quote\",\"device_credential\":\"c\",\"payload\":{}}",
       "error": "invalid_message",
       "kind": "external_request",

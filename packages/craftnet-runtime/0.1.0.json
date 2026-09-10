@@ -18,6 +18,7 @@
     "adapter_storage.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/adapter_storage.lua",
     "adapter_clock.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/adapter_clock.lua",
     "adapter_screen.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/adapter_screen.lua",
-    "adapter_modem.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/adapter_modem.lua"
+    "adapter_modem.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/adapter_modem.lua",
+    "adapter_gateway.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/adapter_gateway.lua"
   }
 }

@@ -307,7 +307,7 @@ local function forward(engine, out, now, options)
   if not pending then
     if options.service then
       engine:record(out, eventBase(engine, {
-        direction = "outbound", kind = "service_request", operation = options.service,
+        direction = "outbound", kind = options.message_kind, operation = options.service,
         outcome = "busy", bytes = engine:measure(options.body),
         request_id = options.from_request_id,
       }), now)
@@ -398,6 +398,64 @@ function messages.service_request(engine, link, message, now, out)
     service = service,
   })
   if not relayed then return atCapacity(out) end
+  out:ok({ forwarded = "up" })
+end
+
+-- external_call passes through on its way to the Central Server, which is the
+-- only role that holds a Gateway Session. An ISP checks exactly what it checks
+-- for any other traffic -- that the Customer Router speaking is speaking for
+-- its own Customer Network -- and carries the rest through untouched.
+--
+-- It never travels downward. An ISP has nothing to serve an external call with.
+function messages.external_call(engine, link, message, now, out)
+  local state = engine.state
+  local body = message.body
+  local operation = get(body, "operation")
+  local bytes = engine:measure(body)
+
+  if link.direction == "parent" then
+    out:replyError(link.relationship_id, message.request_id, "inbound_denied",
+      "the External Application does not call into an ISP")
+    return out:fail("inbound_denied", "external_call may not arrive from upstream")
+  end
+
+  local router = state.routers[link.id]
+  if link.role ~= "router" or not router then
+    return out:fail("forbidden_operation", "only a registered Customer Router may send here")
+  end
+
+  local claimed = get(get(body, "source"), "customer_network_id")
+  if claimed ~= router.customer_network_id then
+    engine:record(out, eventBase(engine, {
+      direction = "inbound", kind = "external_call", operation = operation,
+      outcome = "forbidden_operation", bytes = bytes,
+      customer_network_id = router.customer_network_id, router_id = router.router_id,
+    }), now)
+    out:replyError(link.relationship_id, message.request_id, "forbidden_operation",
+      "a Customer Router may only speak for its own Customer Network")
+    return out:fail("forbidden_operation", "source network does not belong to that router")
+  end
+
+  if not engine.parentRelationshipId then
+    out:replyError(link.relationship_id, message.request_id, "upstream_unavailable",
+      "this ISP has no connection to the Central Server")
+    return out:fail("upstream_unavailable", "no parent relationship")
+  end
+
+  local relayed = forward(engine, out, now, {
+    to_relationship_id = engine.parentRelationshipId,
+    from_relationship_id = link.relationship_id,
+    from_request_id = message.request_id,
+    message_kind = "external_call",
+    body = body,
+    service = operation,
+  })
+  if not relayed then return atCapacity(out) end
+  engine:record(out, eventBase(engine, {
+    direction = "outbound", kind = "external_call", operation = operation,
+    outcome = "delivered_external", bytes = bytes,
+    customer_network_id = router.customer_network_id, router_id = router.router_id,
+  }), now)
   out:ok({ forwarded = "up" })
 end
 

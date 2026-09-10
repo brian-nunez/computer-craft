@@ -9,6 +9,11 @@
 --
 -- A short name resolves inside this Computer's own Customer Network; a longer
 -- one widens a label at a time, up to the fully qualified `.craft` form.
+--
+-- api.craft is the External Application, and it is the one name that is not a
+-- Computer: `craftnet call api.craft test.identity` registers this device if it
+-- has never registered, holds an Access Token until it is nearly spent, and
+-- makes the call.
 
 local arguments = { ... }
 
@@ -39,6 +44,7 @@ local function usage()
   print("  craftnet status")
   print("  craftnet resolve NAME")
   print("  craftnet call NAME SERVICE")
+  print("  craftnet call api.craft OPERATION")
 end
 
 --------------------------------------------------------------------------
@@ -130,6 +136,47 @@ end
 -- call
 --------------------------------------------------------------------------
 
+-- show prints whatever an answer carried, in a stable order.
+local function show(heading, payload)
+  print(heading)
+  payload = payload or protocol.object()
+  local keys = {}
+  for key in pairs(payload) do keys[#keys + 1] = key end
+  table.sort(keys)
+  if #keys == 0 then
+    print("  (it answered with nothing)")
+  end
+  for _, key in ipairs(keys) do
+    print("  " .. key .. " = " .. tostring(rawget(payload, key)))
+  end
+end
+
+-- external calls the External Application. There is no address to look up:
+-- api.craft is reached through an External Operation and the ancestry every hop
+-- between here and the Central Server derived, never by routing to it.
+--
+-- Registering and getting a token happen underneath. An Operator types the
+-- operation they want, not the three calls it takes the first time.
+--
+-- It is reached through `call`, which has already connected to the router.
+local function external(operation)
+  if not operation then
+    printError("Which operation? For example: craftnet call api.craft test.identity")
+    return
+  end
+
+  local payload, code, problem = computer:call(operation, protocol.object())
+  if not payload then
+    printError(tostring(code) .. ": " .. tostring(problem))
+    if code == "gateway_unavailable" then
+      printError("The External Application is not reachable. Everything in world still works.")
+    end
+    return
+  end
+  show(operation .. " on api.craft", payload)
+  return payload
+end
+
 local function call(name, service)
   if not name or not service then
     printError("Which name and which service?")
@@ -144,6 +191,9 @@ local function call(name, service)
     return
   end
   local target = outcome.result
+  if target.kind == "external" then
+    return external(service)
+  end
   if not target.computer_id then
     local answer, problem, message = await("that lookup")
     if not answer then
@@ -168,17 +218,7 @@ local function call(name, service)
     return
   end
 
-  print(service .. " on " .. name)
-  local payload = answer.payload or protocol.object()
-  local keys = {}
-  for key in pairs(payload) do keys[#keys + 1] = key end
-  table.sort(keys)
-  if #keys == 0 then
-    print("  (it answered with nothing)")
-  end
-  for _, key in ipairs(keys) do
-    print("  " .. key .. " = " .. tostring(rawget(payload, key)))
-  end
+  show(service .. " on " .. name, answer.payload)
 end
 
 --------------------------------------------------------------------------

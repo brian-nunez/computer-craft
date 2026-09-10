@@ -59,6 +59,24 @@ craftnetd serve -listen 0.0.0.0:8080
 
 Behind TLS, add `-secure-cookies`. The dashboard is at the address it prints.
 
+### Let the Central Server reach it
+
+The Central Server opens the Gateway with CC:Tweaked's HTTP API, so that has to
+be on and the host has to be allowed. In the CC:Tweaked server config:
+
+```toml
+[http]
+enabled = true
+
+[[http.rules]]
+host = "YOUR-HOST"
+action = "allow"
+```
+
+If the API is off or the host is blocked, everything in world still works —
+addressing, names, routing, NAT, Network Status. External calls give
+`gateway_unavailable`, and the dashboard shows the World as stale.
+
 > The password is read from standard input rather than from a flag, because a
 > flag is visible in your shell history and in the process list of everyone else
 > on that machine.
@@ -217,12 +235,18 @@ From `alex-pc`:
 craftnet status
 craftnet resolve harvester.farm.acme.craft
 craftnet call harvester.farm.acme.craft harvester.status
+craftnet call api.craft test.identity
 ```
 
 `craftnet status` prints this Computer's address, network, router, DNS, ISP, and
 full `.craft` name. Names widen a label at a time: `harvester` works from inside
 Farm, `harvester.farm` from anywhere on Acme, and the full form from anywhere in
 the World.
+
+`craftnet call api.craft test.identity` is the External Application. It reports
+the World, ISP, Customer Network, Customer Router, Computer, and address the
+call actually arrived on — verified at every hop, never claimed. The first call
+from a Computer registers it and gets it a token; you do not do either by hand.
 
 Then open the dashboard. You should see the whole World: the ISP with its
 allocation, both Customer Networks with their Provider Addresses, and all four
@@ -259,6 +283,7 @@ Nothing below needs a file edited or a value looked up in source.
 | | `craftnet status` | What this Computer is and where |
 | | `craftnet resolve NAME` | Turn a CraftNet Name into a scoped address |
 | | `craftnet call NAME SERVICE` | Call a service and print what comes back |
+| | `craftnet call api.craft OPERATION` | Call the External Application |
 | | `startup` | Run it |
 | The Go machine | `craftnetd provision` | Create a World and print its bundle once |
 | | `craftnetd operator` | Add, re-password, disable, or list Operators |

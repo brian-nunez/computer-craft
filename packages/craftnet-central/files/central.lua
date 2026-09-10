@@ -19,6 +19,12 @@ local central = {}
 central.ISP_DISCOVERY_CHANNEL = 42000
 central.ISP_CHANNEL_BASE = 42100
 
+-- How many Traffic Events travel in one batch, and how many wait for a session
+-- that is not there. Both come from what the wire and the role already state:
+-- the protocol's batch limit, and the Central Server's own buffer capacity.
+central.TRAFFIC_BATCH = protocol.limits.TRAFFIC_BATCH_EVENTS
+central.TRAFFIC_QUEUE = 2000
+
 local Central = {}
 Central.__index = Central
 
@@ -35,6 +41,16 @@ function central.new(options)
     transport = adapters.transport,
     clock = adapters.clock,
     discoveryChannel = options.discovery_channel or central.ISP_DISCOVERY_CHANNEL,
+    -- How this Central Server builds its Gateway. A ready-made adapter may be
+    -- handed in instead, which is what a test drives a whole World with; the
+    -- factory is what a real Computer uses, because the socket must not be
+    -- opened until the World identity is known.
+    gateway = adapters.gateway,
+    gatewayFactory = options.gateway_factory or runtimePackage.adapters.gateway,
+    -- What this World has observed but not yet reported. It fills whether or
+    -- not there is a session, and is bounded, so a stopped External Application
+    -- costs a Central Server a fixed amount of memory rather than a growing one.
+    pendingTraffic = {},
     runtime = runtimePackage.new({
       role = "central",
       path = options.path or "craftnet/central",
@@ -59,7 +75,10 @@ function Central:start()
   if not ok then return nil, source, problem end
   self.secrets = self.runtime:secrets()
   self.secrets:load()
-  if self:state().world_id then self:installListener() end
+  if self:state().world_id then
+    self:installListener()
+    self:installGateway()
+  end
   return true, source
 end
 
@@ -95,7 +114,140 @@ function Central:provision(bundle)
   if not ok then return nil, "internal_error", problem end
 
   self:installListener()
+  self:installGateway()
   return true
+end
+
+--------------------------------------------------------------------------
+-- The Gateway Session
+--------------------------------------------------------------------------
+
+-- installGateway builds the one outbound WebSocket this World has. It is not
+-- opened here: connecting is the loop's job, under backoff, because the
+-- External Application not being up is an ordinary condition rather than a
+-- reason a Central Server cannot start.
+--
+-- A World provisioned without a URL simply has no Gateway. Everything internal
+-- -- addressing, DNS, routing, NAT, Network Status -- carries on exactly as it
+-- does when craftnetd is stopped, and external calls fail with a stable code.
+function Central:installGateway()
+  local state = self:state()
+  if not state.gateway_url or state.gateway_url == "" then return nil end
+  if self.gateway then return self.gateway end
+  if not self.gatewayFactory then return nil end
+
+  self.gateway = self.gatewayFactory({
+    url = state.gateway_url,
+    world_id = state.world_id,
+    central_id = state.central_id,
+    clock = self.clock,
+    credential = function()
+      return self.secrets:get(state.gateway_credential_ref)
+    end,
+    -- What this World already holds, so a reconnecting session is answered
+    -- against it rather than being resent everything from the beginning.
+    revisions = function()
+      return self:state().revision or 0, self:state().traffic_sequence or 0
+    end,
+  })
+
+  -- CraftOS delivers websocket events through the same queue as modem messages,
+  -- so the transport this role already polls is where they have to be caught.
+  if type(self.transport.observe) == "function" then
+    self.transport:observe(function(event, url, message)
+      return self.gateway:observe(event, url, message)
+    end)
+  end
+
+  self.runtime.adapters.gateway = self.gateway
+  return self.gateway
+end
+
+-- drainGateway hands the External Application's frames to the engine. It is a
+-- separate step from receiving them on purpose: the adapter owns the socket,
+-- this owns what a frame means, and the engine owns what it does.
+function Central:drainGateway()
+  if not self.gateway then return 0 end
+  local drained = 0
+  while self.gateway:pending() > 0 do
+    local frame = self.gateway:next()
+    if not frame then break end
+    self:receiveGateway(frame.kind, frame.body, {
+      request_id = frame.request_id, command_id = frame.command_id,
+    })
+    drained = drained + 1
+  end
+  return drained
+end
+
+function Central:gatewayStatus()
+  if not self.gateway then
+    return { ready = false, url = self:state().gateway_url }
+  end
+  return self.gateway:describe()
+end
+
+--------------------------------------------------------------------------
+-- What this World reports
+--------------------------------------------------------------------------
+
+-- publishTopology sends the whole projection. It happens once each time a
+-- session opens, because a reconnecting Central Server may have changed while
+-- it was away and the External Application has no way to know what it missed.
+function Central:publishTopology()
+  if not (self.gateway and self.gateway:ready()) then return nil end
+  local topology = self:topology()
+  if not topology then return nil end
+  local ok, problem = self.gateway:send("topology_snapshot", topology)
+  if not ok then return nil, "gateway_unavailable", problem end
+  return true
+end
+
+-- publishTraffic relays what this Central Server observed. Sequences are
+-- durable and strictly increasing, so a batch lost to a disconnect shows up at
+-- the far end as a gap in the record rather than as a plausible present.
+--
+-- Events accumulate whether or not there is a session; the queue is bounded by
+-- the same capacity the engine's own buffer uses, and past it the oldest are
+-- dropped. A World does not grow without limit because craftnetd is down.
+function Central:publishTraffic()
+  local drained = self.runtime:drainTelemetry()
+  for _, event in ipairs(drained) do
+    self.pendingTraffic[#self.pendingTraffic + 1] = event
+  end
+  while #self.pendingTraffic > central.TRAFFIC_QUEUE do
+    table.remove(self.pendingTraffic, 1)
+    self.trafficDropped = (self.trafficDropped or 0) + 1
+  end
+  if not (self.gateway and self.gateway:ready()) then return 0 end
+
+  local sentBatches = 0
+  while #self.pendingTraffic > 0 do
+    local events = protocol.array()
+    for _ = 1, math.min(central.TRAFFIC_BATCH, #self.pendingTraffic) do
+      rawset(events, #events + 1, table.remove(self.pendingTraffic, 1))
+    end
+
+    local state = self:state()
+    local first = (state.traffic_sequence or 0) + 1
+    local last = first + #events - 1
+    local ok = self.gateway:send("traffic_batch", protocol.object({
+      first_sequence = first,
+      last_sequence = last,
+      events = events,
+    }))
+    if not ok then
+      -- The session went away mid-flight. These events are not re-queued: the
+      -- sequence they were given is spent, and the far end will record the
+      -- hole rather than be handed the same numbers twice.
+      return sentBatches
+    end
+
+    state.traffic_sequence = last
+    self.runtime.store:save(state, self.clock:now())
+    sentBatches = sentBatches + 1
+  end
+  return sentBatches
 end
 
 --------------------------------------------------------------------------
@@ -268,8 +420,58 @@ end
 -- Serving
 --------------------------------------------------------------------------
 
-function Central:serve(timeoutMs) return self.runtime:pump(timeoutMs) end
-function Central:tick() return self.runtime:tick() end
-function Central:run(options) return self.runtime:run(options) end
+-- serve takes one turn of the loop. The Gateway is drained around it: a frame
+-- that arrived while this role was waiting on a modem is acted on here rather
+-- than sitting in the adapter until something else happens to wake the World.
+function Central:serve(timeoutMs)
+  self:drainGateway()
+  local outcome = self.runtime:pump(timeoutMs)
+  self:drainGateway()
+  return outcome
+end
+
+-- tick advances everything time drives, the Gateway included: reconnecting
+-- under backoff, heartbeating a session that would otherwise be silent while
+-- the World is idle, and reporting what this Central Server has observed.
+--
+-- A session that has just opened is told the whole topology before anything
+-- else travels on it, so the External Application never has to place a Traffic
+-- Event against a World it has not been shown.
+function Central:tick()
+  if self.gateway then
+    if type(self.gateway.tick) == "function" then self.gateway:tick() end
+    local session = self.gateway:session()
+    if session and session ~= self.publishedSession then
+      if self:publishTopology() then self.publishedSession = session end
+    end
+    self:publishTraffic()
+    self:drainGateway()
+  end
+  return self.runtime:tick()
+end
+
+-- run is the loop a startup program enters. It is written here rather than
+-- delegated to the runtime because the Central Server is the one role with two
+-- things to wait on, and the wait has to be short enough for both.
+function Central:run(options)
+  options = options or {}
+  local iterations = 0
+  self.running = true
+  while self.running do
+    iterations = iterations + 1
+    if options.max_iterations and iterations > options.max_iterations then break end
+    if not self:serve(options.idle_timeout_ms or 1000) then
+      self:tick()
+    end
+  end
+  return iterations
+end
+
+function Central:stop()
+  self.running = false
+  self.runtime:stop()
+  if self.gateway then self.gateway:disconnect() end
+  return true
+end
 
 return central

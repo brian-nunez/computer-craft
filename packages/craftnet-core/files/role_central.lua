@@ -18,10 +18,15 @@ local handlers = {
   link_down = shared.link_down,
   tick = shared.tick,
   message = shared.message,
-  effect_result = shared.effect_result,
 }
 
 local get = rawget
+
+-- The Gateway Session is not a CraftNet relationship: it has no modem, no
+-- channel, and no session key. It does hold correlated work, though, and that
+-- work needs somewhere to be counted and looked up, so it is given one constant
+-- name inside the Central Server's own gateway table and nowhere else.
+local GATEWAY_RELATIONSHIP = "gateway"
 
 -- The whole RFC 6598 shared space, delegated to ISPs a block at a time.
 local PROVIDER_SPACE = { first = ipv4.toNumber("100.64.0.0"), last = ipv4.toNumber("100.127.255.255") }
@@ -543,6 +548,162 @@ function handlers.external_request(engine, input, now, out)
   out:ok({ operation = input.operation, forwarded = true })
 end
 
+-- external_call is the in-world leg of the same path. A Computer named an
+-- External Operation, its Customer Router NATted the call, its ISP carried it
+-- here, and this is where it stops being a message on a modem and becomes a
+-- request on the Gateway.
+--
+-- Nothing a caller wrote decides who it is. The source Customer Network must be
+-- one this ISP actually owns, and the ancestry that reaches the External
+-- Application is stamped from the route directory by the handler above.
+function messages.external_call(engine, link, message, now, out)
+  local state = engine.state
+  local body = message.body
+  local operation = get(body, "operation")
+  local bytes = engine:measure(body)
+
+  if link.role ~= "isp" or not state.isps[link.id] then
+    return out:fail("forbidden_operation", "only a registered ISP may send here")
+  end
+
+  local source = get(body, "source")
+  local sourceNetwork = get(source, "customer_network_id")
+  local route = state.routes[sourceNetwork]
+  if not route or route.isp_id ~= link.id then
+    engine:record(out, eventBase(engine, {
+      direction = "inbound", kind = "external_call", operation = operation,
+      outcome = "forbidden_operation", bytes = bytes, isp_id = link.id,
+      customer_network_id = sourceNetwork,
+    }), now)
+    out:replyError(link.relationship_id, message.request_id, "forbidden_operation",
+      "an ISP may only carry traffic for its own Customer Networks")
+    return out:fail("forbidden_operation", "source network is not served by that ISP")
+  end
+
+  -- The Gateway's own in-flight bound. Refusing here is what keeps a World that
+  -- cannot reach the External Application from accumulating work it will never
+  -- be able to answer.
+  local gatewayRequestId = engine:allocateRequestId()
+  local pending = engine.gateway:open({
+    relationship_id = GATEWAY_RELATIONSHIP,
+    request_id = gatewayRequestId,
+    reply_to_relationship_id = link.relationship_id,
+    reply_to_request_id = message.request_id,
+    peer_flow_id = get(body, "source_flow_id"),
+    customer_network_id = sourceNetwork,
+    computer_id = get(source, "computer_id"),
+    isp_id = link.id,
+    service = operation,
+  }, now)
+  if not pending then
+    engine:record(out, eventBase(engine, {
+      direction = "outbound", kind = "external_call", operation = operation,
+      outcome = "busy", bytes = bytes, isp_id = link.id,
+      customer_network_id = sourceNetwork,
+    }), now)
+    out:replyError(link.relationship_id, message.request_id, "busy",
+      "the Gateway Session already holds its outstanding requests")
+    return out:fail("busy", "the Gateway Session is at capacity")
+  end
+
+  handlers.external_request(engine, {
+    operation = operation,
+    customer_network_id = sourceNetwork,
+    computer_id = get(source, "computer_id"),
+    local_address = get(source, "local_address"),
+    source_flow_id = get(body, "source_flow_id"),
+    payload = get(body, "payload"),
+    access_token = get(body, "access_token"),
+    device_credential = get(body, "device_credential"),
+    registration_nonce = get(body, "registration_nonce"),
+    request_id = gatewayRequestId,
+  }, now, out)
+
+  local forwarded = out.result
+  if not forwarded.ok then
+    -- The route was withdrawn, the network was disabled, or the operation name
+    -- was not one. The Computer hears the reason rather than a timeout.
+    engine.gateway:close(pending.flow_id)
+    engine:record(out, eventBase(engine, {
+      direction = "inbound", kind = "external_call", operation = operation,
+      outcome = forwarded.code, bytes = bytes, isp_id = link.id,
+      customer_network_id = sourceNetwork,
+    }), now)
+    out:replyError(link.relationship_id, message.request_id,
+      forwarded.code, forwarded.message)
+    return out:fail(forwarded.code, forwarded.message)
+  end
+
+  engine:record(out, eventBase(engine, {
+    direction = "outbound", kind = "external_call", operation = operation,
+    outcome = "delivered_external", bytes = bytes, isp_id = link.id,
+    customer_network_id = sourceNetwork, router_id = route.router_id,
+    request_id = gatewayRequestId,
+  }), now)
+  out:ok({ forwarded = true, operation = operation, request_id = gatewayRequestId })
+end
+
+-- settleExternal sends the External Application's answer back down the exact
+-- path the call took. The flow identifier the source Customer Router opened
+-- travels back with it, which is what lets that router find the one Computer
+-- that asked among however many hold the same RFC 1918 address.
+local function settleExternal(engine, input, now, out)
+  local requestId = input.request_id
+  local record = requestId
+    and engine.gateway:byCorrelation(GATEWAY_RELATIONSHIP, requestId)
+  if not record then
+    -- The call expired, or the External Application answered something it was
+    -- never asked. Nothing is invented for a Computer that is no longer there.
+    return out:fail("nat_flow_missing", "no external call matches that answer")
+  end
+  engine.gateway:close(record.flow_id)
+
+  local body = input.body or protocol.object()
+  local outcome, replyKind, replyBody
+  if input.frame_kind == "error" then
+    local code = get(body, "code")
+    outcome = protocol.errors.isKnown(code) and code or "internal_error"
+    replyKind, replyBody = "error", body
+  else
+    outcome = "delivered_external"
+    replyKind = "service_response"
+    replyBody = protocol.object({ payload = get(body, "payload") or protocol.object() })
+    if record.peer_flow_id then
+      rawset(replyBody, "source_flow_id", record.peer_flow_id)
+    end
+  end
+
+  out:reply(record.reply_to_relationship_id, replyKind, replyBody, record.reply_to_request_id)
+  engine:record(out, eventBase(engine, {
+    direction = "inbound", kind = "external_call", operation = record.service,
+    outcome = outcome, bytes = engine:measure(body), isp_id = record.isp_id,
+    customer_network_id = record.customer_network_id, request_id = requestId,
+  }), now)
+  return out:ok({ request_id = requestId, outcome = outcome })
+end
+
+-- effect_result adds one thing to the shared transition: a Gateway send that
+-- could not leave is an answer owed to whoever is waiting in world. Without
+-- this, a stopped External Application would look to a Computer like silence
+-- instead of like `gateway_unavailable`.
+function handlers.effect_result(engine, input, now, out)
+  if input.effect == "gateway" and not input.ok and input.request_id then
+    local record = engine.gateway:byCorrelation(GATEWAY_RELATIONSHIP, input.request_id)
+    if record and record.reply_to_relationship_id then
+      engine.gateway:close(record.flow_id)
+      local code = input.code or "gateway_unavailable"
+      out:replyError(record.reply_to_relationship_id, record.reply_to_request_id,
+        code, input.message or "the External Application is not reachable")
+      engine:record(out, eventBase(engine, {
+        direction = "outbound", kind = "external_call", operation = record.service,
+        outcome = code, bytes = 0, isp_id = record.isp_id,
+        customer_network_id = record.customer_network_id, request_id = input.request_id,
+      }), now)
+    end
+  end
+  return shared.effect_result(engine, input, now, out)
+end
+
 -- reject answers an administrative command the Central Server will not carry
 -- out. The answer always goes back, applied or rejected: a command with no
 -- answer is one the External Application resends forever under the same Command
@@ -558,18 +719,23 @@ local function reject(engine, out, commandId, requestId, code, message)
   return out:fail(code, message)
 end
 
--- gateway_frame is what arrived on the Gateway Session. The only thing v1
--- accepts inward is an administrative command, and the only administrative
--- command is set_network_status: the External Application observes a World and
--- may disable a Customer Network, and that is the whole of its authority.
+-- gateway_frame is what arrived on the Gateway Session. Two things travel
+-- inward: the answer to an External Operation a Computer in this World asked
+-- for, and an administrative command.
 --
--- Everything an Operator asked for is applied here, by the Central Server, on
--- its own authoritative state. The External Application never edits a World; it
--- asks, and this is where the asking is answered.
+-- The only administrative command is set_network_status: the External
+-- Application observes a World and may disable a Customer Network, and that is
+-- the whole of its authority. Everything an Operator asked for is applied here,
+-- by the Central Server, on its own authoritative state. The External
+-- Application never edits a World; it asks, and this is where the asking is
+-- answered.
 function handlers.gateway_frame(engine, input, now, out)
+  if input.frame_kind == "external_response" or input.frame_kind == "error" then
+    return settleExternal(engine, input, now, out)
+  end
   if input.frame_kind ~= "admin_command" then
     return out:fail("forbidden_operation",
-      "the Gateway carries only administrative commands inward")
+      "the Gateway carries only answers and administrative commands inward")
   end
 
   local body = input.body or protocol.object()

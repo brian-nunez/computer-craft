@@ -245,19 +245,25 @@ function Runtime:performDeliver(effect)
   return { kind = "application_response", pending_id = effect.pending_id, payload = payload }
 end
 
+-- performGateway carries one message over the Gateway Session. The correlation
+-- travels back with the result: an External Operation that could not leave is
+-- an answer owed to a Computer that is still waiting, and the Central Server
+-- cannot give it one without knowing which request failed.
 function Runtime:performGateway(effect)
+  local correlation = { request_id = effect.request_id, command_id = effect.command_id }
   local gateway = self.adapters.gateway
   if not gateway then
     return { kind = "effect_result", effect = "gateway", ok = false,
+      request_id = effect.request_id, command_id = effect.command_id,
       code = "gateway_unavailable", message = "this role has no Gateway Session" }
   end
-  local ok, problem = gateway:send(effect.message_kind, effect.body, {
-    request_id = effect.request_id, command_id = effect.command_id,
-  })
+  local ok, problem = gateway:send(effect.message_kind, effect.body, correlation)
   if ok then
-    return { kind = "effect_result", effect = "gateway", ok = true }
+    return { kind = "effect_result", effect = "gateway", ok = true,
+      request_id = effect.request_id, command_id = effect.command_id }
   end
   return { kind = "effect_result", effect = "gateway", ok = false,
+    request_id = effect.request_id, command_id = effect.command_id,
     code = "gateway_unavailable", message = problem or "the Gateway Session is not ready" }
 end
 

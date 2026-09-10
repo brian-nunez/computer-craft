@@ -178,6 +178,59 @@ function handlers.local_request(engine, input, now, out)
   out:ok({ request_id = requestId })
 end
 
+-- external_call is an application on this Computer reaching the External
+-- Application. It goes to the Customer Router like everything else, and it
+-- carries no destination: `api.craft` is not a Customer Network, so there is
+-- nothing to scope. The kind says where it is going.
+--
+-- What comes back is an ordinary service_response, which is why there is no
+-- reply handler here: a reply retraces its NAT Flow by one rule regardless of
+-- whether a Computer or the External Application answered it.
+function handlers.external_call(engine, input, now, out)
+  local state = engine.state
+  if not engine.parentRelationshipId then
+    return out:fail("router_unavailable", "this Computer is not connected to its router")
+  end
+  if not protocol.validate.operationName(input.operation or "") then
+    return out:fail("invalid_message", "an operation name is 1 to 64 lowercase characters")
+  end
+
+  local body = protocol.object({
+    source = protocol.object({
+      computer_id = state.computer_id,
+      customer_network_id = state.customer_network_id,
+      local_address = state.address,
+    }),
+    operation = input.operation,
+    payload = input.payload or protocol.object(),
+  })
+  if input.access_token then rawset(body, "access_token", input.access_token) end
+  if input.device_credential then rawset(body, "device_credential", input.device_credential) end
+  if input.registration_nonce then rawset(body, "registration_nonce", input.registration_nonce) end
+
+  -- The External Application would refuse the wrong credential for this
+  -- operation. Refusing it here costs three hops less and tells the caller
+  -- something it can act on.
+  local allowed, problem = protocol.validate.credentialUse(body)
+  if not allowed then
+    return out:fail("invalid_message", problem)
+  end
+
+  local requestId = engine:allocateRequestId()
+  local outstanding = engine.transit:open({
+    relationship_id = engine.parentRelationshipId,
+    request_id = requestId,
+    intent = "external",
+    service = input.operation,
+  }, now)
+  if not outstanding then
+    return out:fail("busy", "this Computer already holds its outstanding requests")
+  end
+
+  out:send(engine.parentRelationshipId, "external_call", body, requestId)
+  out:ok({ request_id = requestId, operation = input.operation })
+end
+
 -- application_response answers a request this Computer was asked to serve.
 function handlers.application_response(engine, input, now, out)
   local record = engine.transit:byFlowId(input.pending_id)

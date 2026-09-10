@@ -61,6 +61,16 @@ function engine.new(options)
       idle_ms = options.flow_idle_ms,
       capacity = options.in_flight or protocol.limits.RELATIONSHIP_IN_FLIGHT,
     }),
+    -- The Central Server is the only role that holds a Gateway Session, and the
+    -- Gateway carries a bound of its own: a World may legitimately have far
+    -- more work outstanding to the External Application than any one modem
+    -- relationship may have to its neighbour. Giving it its own table is what
+    -- keeps the two numbers from being confused for each other.
+    gateway = role == "central" and flows.newTable({
+      prefix = options.gateway_prefix or "gateway",
+      idle_ms = options.flow_idle_ms,
+      capacity = options.gateway_in_flight or protocol.limits.GATEWAY_IN_FLIGHT,
+    }) or nil,
     nextRequestNumber = 1,
     nextEventNumber = 1,
   }, Engine)
@@ -234,6 +244,15 @@ function engine.shared.tick(instance, input, now, out)
   end
   for _, entry in ipairs(instance.transit:expire(now)) do
     out:ephemeral("transit_expired", { flow_id = entry.flow_id })
+  end
+  if instance.gateway then
+    -- An External Operation that never came back expires like anything else.
+    -- The Computer still waiting for it sees a request_timeout rather than a
+    -- reply the Central Server invented.
+    for _, entry in ipairs(instance.gateway:expire(now)) do
+      expired[#expired + 1] = entry
+      out:ephemeral("gateway_expired", { flow_id = entry.flow_id })
+    end
   end
   out:ok({ expired = #expired })
 end

@@ -86,6 +86,27 @@ protocol.handshake = {
   open = frame.openHandshake,
 }
 
+-- The Gateway is the one CraftNet link that is not a modem relationship and
+-- carries no session MAC: it is a WebSocket, authenticated once in its
+-- Authorization header and trusted afterwards through WSS and the session it
+-- opened. Its envelope still belongs to the protocol, so a Central Server's
+-- transport adapter moves bytes and nothing else.
+protocol.gateway = internal("gateway")
+
+-- Registering a device with the External Application is the one exchange a
+-- Computer takes part in that is not a CraftNet handshake, and it still needs a
+-- value that is different every time. CraftOS never uses math.random as a
+-- security source, so it is derived exactly as a handshake nonce is: from the
+-- durable LAN Credential and a counter the Computer commits before it sends.
+--
+-- The derivation is named for what it is for rather than exposed as a key
+-- helper, so nothing outside this package is ever handed one.
+protocol.registration = {
+  nonce = function(lanCredential, generation)
+    return keys.nonce(lanCredential, "computer", generation)
+  end,
+}
+
 -- One-time enrollment tokens. A parent issues one, an Operator carries it to a
 -- child, and the child proves the exchange under it exactly as a Computer
 -- proves a LAN join under a LAN Password.
@@ -119,6 +140,11 @@ protocol.validate = {
   role = schema.scalars.role,
   connectivityState = schema.scalars.connectivity_state,
   networkStatus = schema.scalars.network_status,
+  -- Which credential an External Operation may present. This one reads several
+  -- fields rather than one value, which makes it the exception here; it is
+  -- public for the same reason the rest are, so that a Computer refusing its
+  -- own mistake and the External Application refusing it apply one rule.
+  credentialUse = schema.validateCredentialUse,
 }
 
 --------------------------------------------------------------------------

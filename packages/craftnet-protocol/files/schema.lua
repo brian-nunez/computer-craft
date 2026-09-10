@@ -328,6 +328,32 @@ schema.assignments = assignments
 -- Message body schemas
 --------------------------------------------------------------------------
 
+-- validateCredentialUse fixes which credential an operation may present.
+-- device.register offers the authenticated ancestry as its only attestation;
+-- every other combination is rejected rather than quietly preferred. The rule
+-- lives here because both legs of the external path enforce it: the in-world
+-- external_call a Computer sends, and the external_request the Central Server
+-- puts on the Gateway. A Computer that got it wrong is refused by its own
+-- router rather than three hops later.
+function schema.validateCredentialUse(value)
+  local operation = rawget(value, "operation")
+  local hasToken = rawget(value, "access_token") ~= nil
+  local hasCredential = rawget(value, "device_credential") ~= nil
+  local hasNonce = rawget(value, "registration_nonce") ~= nil
+  local expected
+  if operation == "device.register" then
+    expected = { token = false, credential = false, nonce = true }
+  elseif operation == "token.issue" or operation == "device.rotate" then
+    expected = { token = false, credential = true, nonce = false }
+  else
+    expected = { token = true, credential = false, nonce = false }
+  end
+  if hasToken ~= expected.token or hasCredential ~= expected.credential or hasNonce ~= expected.nonce then
+    return false, "operation '" .. tostring(operation) .. "' does not permit this credential combination"
+  end
+  return true
+end
+
 local bodies = {
   discover = { required = { role = "role", client_nonce = "nonce" } },
   offer = {
@@ -432,6 +458,22 @@ local bodies = {
     required = { payload = "object" },
     optional = { source_flow_id = "id", destination_flow_id = "id" },
   },
+  -- external_call is how a Computer names the External Application in world.
+  -- It carries no destination: a service_request destination is scoped to a
+  -- Customer Network, and the External Application is not one. The kind itself
+  -- is the destination, which is why widening `destination` was the wrong shape
+  -- for it. The answer comes back as an ordinary service_response, so a reply
+  -- retraces its NAT Flow by exactly one rule regardless of what it answers.
+  external_call = {
+    required = { source = "source", operation = "operation_name", payload = "object" },
+    optional = {
+      source_flow_id = "id", access_token = "string",
+      device_credential = "string", registration_nonce = "nonce",
+    },
+    check = function(value)
+      return schema.validateCredentialUse(value)
+    end,
+  },
   error = composites.error_body,
   topology_snapshot = {
     required = {
@@ -491,26 +533,8 @@ local bodies = {
   external_request = {
     required = { ancestry = "ancestry", source_flow_id = "id", operation = "operation_name", payload = "object" },
     optional = { access_token = "string", device_credential = "string", registration_nonce = "nonce" },
-    -- Credential presence is fixed by the operation. device.register offers the
-    -- authenticated ancestry as its only attestation; every other combination
-    -- is rejected rather than quietly preferred.
     check = function(value)
-      local operation = rawget(value, "operation")
-      local hasToken = rawget(value, "access_token") ~= nil
-      local hasCredential = rawget(value, "device_credential") ~= nil
-      local hasNonce = rawget(value, "registration_nonce") ~= nil
-      local expected
-      if operation == "device.register" then
-        expected = { token = false, credential = false, nonce = true }
-      elseif operation == "token.issue" or operation == "device.rotate" then
-        expected = { token = false, credential = true, nonce = false }
-      else
-        expected = { token = true, credential = false, nonce = false }
-      end
-      if hasToken ~= expected.token or hasCredential ~= expected.credential or hasNonce ~= expected.nonce then
-        return false, "operation '" .. tostring(operation) .. "' does not permit this credential combination"
-      end
-      return true
+      return schema.validateCredentialUse(value)
     end,
   },
   external_response = { required = { payload = "object" } },
@@ -546,8 +570,8 @@ schema.transports = {
   -- Operational frames are MACed under a live session key.
   operational = set("heartbeat", "ack", "config_request", "config_snapshot", "dns_query",
     "dns_result", "route_register", "route_remove", "service_request", "service_response",
-    "error", "topology_snapshot", "topology_change", "traffic_batch", "network_status_set",
-    "command_result"),
+    "external_call", "error", "topology_snapshot", "topology_change", "traffic_batch",
+    "network_status_set", "command_result"),
   -- The Gateway relies on WSS plus the authenticated session, not a second MAC.
   gateway = set("heartbeat", "ack", "external_request", "external_response", "error",
     "topology_snapshot", "topology_change", "traffic_batch", "admin_command", "command_result"),
