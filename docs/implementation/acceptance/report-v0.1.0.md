@@ -39,7 +39,7 @@ make test
 
 | Suite | Result |
 |---|---|
-| Lua | **253 tests, 0 failures** |
+| Lua | **294 tests, 0 failures** |
 | Protocol fixture catalog | valid, and regenerating it produces no diff |
 | `ccpm` package catalog | valid |
 | Go, `-race`, two seeds | all packages pass |

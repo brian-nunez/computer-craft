@@ -503,6 +503,295 @@ test("a disabled Customer Network cannot reach the External Application either",
 end)
 
 --------------------------------------------------------------------------
+-- Scenario 8 -- use the External Application
+--------------------------------------------------------------------------
+
+-- These drive the whole external path over the real packages: a Computer's own
+-- command, its Customer Router's NAT, its ISP, and the Central Server's Gateway
+-- seam. What stands in for craftnetd is a Gateway with the same send/pending/
+-- next interface the real adapter has, so what is exercised here is the code
+-- that runs in world -- including Central:drainGateway.
+
+local function newApplication(options)
+  options = options or {}
+  local application = { queue = {}, seen = {}, credentials = {} }
+
+  function application:ready() return true end
+  function application:session() return options.session or "gws-000001" end
+  function application:describe() return { ready = true, gateway_session_id = self:session() } end
+  function application:tick() return true end
+  function application:disconnect() return true end
+  function application:pending() return #self.queue end
+  function application:next() return table.remove(self.queue, 1) end
+
+  function application:answer(requestId, payload)
+    self.queue[#self.queue + 1] = {
+      kind = "external_response", request_id = requestId,
+      body = protocol.object({ payload = payload }),
+    }
+  end
+
+  function application:refuse(requestId, code, message)
+    self.queue[#self.queue + 1] = {
+      kind = "error", request_id = requestId,
+      body = protocol.errors.new(code, message),
+    }
+  end
+
+  function application:send(kind, body, correlation)
+    self.seen[#self.seen + 1] = { kind = kind, body = body, correlation = correlation }
+    if kind ~= "external_request" then return true end
+
+    local operation = get(body, "operation")
+    self.credentials[operation] = {
+      access_token = get(body, "access_token") ~= nil,
+      device_credential = get(body, "device_credential") ~= nil,
+      registration_nonce = get(body, "registration_nonce") ~= nil,
+    }
+    self.calls = (self.calls or 0) + 1
+
+    if options.refuse then
+      self:refuse(correlation.request_id, "forbidden_operation", "that operation is not allowed")
+    elseif operation == "device.register" then
+      self:answer(correlation.request_id,
+        protocol.object({ device_credential = "dev-cred-1", device_id = "dev-1" }))
+    elseif operation == "token.issue" then
+      self:answer(correlation.request_id, protocol.object({ access_token = "opaque.bearer.token" }))
+    else
+      local ancestry = get(body, "ancestry")
+      self:answer(correlation.request_id, protocol.object({
+        world_id = get(ancestry, "world_id"),
+        isp_id = get(ancestry, "isp_id"),
+        customer_network_id = get(ancestry, "customer_network_id"),
+        router_id = get(ancestry, "router_id"),
+        computer_id = get(ancestry, "computer_id"),
+        local_address = get(ancestry, "local_address"),
+      }))
+    end
+    return true
+  end
+
+  return application
+end
+
+-- attach installs the stand-in on both seams the Central Server reads: the
+-- runtime performs gateway effects through the adapter, and the composition
+-- root drains inbound frames from it.
+local function attach(world, application)
+  world.central.gateway = application
+  world.central.runtime.adapters.gateway = application
+  return application
+end
+
+local function externalWorld(options)
+  local world = fullWorld()
+  return world, attach(world, newApplication(options))
+end
+
+test("scenario 8: a Computer registers, gets a token, and names its own path", function()
+  local world, application = externalWorld()
+  local answer, code, problem
+
+  world:pump(function()
+    answer, code, problem = world.nodes["harvester"]:call("test.identity", protocol.object())
+  end, "harvester")
+
+  assertTrue(answer ~= nil, "the call was answered: " .. tostring(code) .. " " .. tostring(problem))
+  assertEqual(application.calls, 3, "it took register, token, and the operation itself")
+
+  -- Each operation presented exactly the credential it is allowed, and no other.
+  local registering = application.credentials["device.register"]
+  assertTrue(registering.registration_nonce, "registering offers a nonce")
+  assertTrue(not registering.access_token and not registering.device_credential,
+    "and nothing else -- the verified ancestry is the attestation")
+  local issuing = application.credentials["token.issue"]
+  assertTrue(issuing.device_credential, "the token is bought with the Device Credential")
+  assertTrue(not issuing.access_token, "not with a token it does not have yet")
+  local calling = application.credentials["test.identity"]
+  assertTrue(calling.access_token, "an ordinary operation presents its Access Token")
+  assertTrue(not calling.device_credential, "and not the Device Credential")
+
+  -- test.identity reports the ancestry the far end actually verified.
+  assertEqual(get(answer, "world_id"), "world-overworld", "World")
+  assertEqual(get(answer, "isp_id"), "isp-acme", "ISP")
+  assertEqual(get(answer, "customer_network_id"), "network-farm", "Customer Network")
+  assertEqual(get(answer, "router_id"), "router-farm", "Customer Router")
+  assertEqual(get(answer, "local_address"), "192.168.1.20",
+    "Farm's .20, which Home holds too")
+end)
+
+test("scenario 8: the Device Credential is kept out of the state snapshot", function()
+  local world, application = externalWorld()
+  world:pump(function()
+    world.nodes["harvester"]:call("test.identity", protocol.object())
+  end, "harvester")
+
+  local computer = world.nodes["harvester"]
+  assertTrue(computer.secrets:get(worlds.computer.DEVICE_CREDENTIAL_REF) ~= nil,
+    "the credential is held in the secret store")
+
+  local snapshot = world.storage["harvester"].files["state/computer.json"]
+  assertTrue(snapshot ~= nil, "the Computer wrote a snapshot")
+  assertTrue(snapshot:find("dev-cred-1", 1, true) == nil,
+    "and no secret value is in it")
+  assertTrue(snapshot:find("opaque.bearer.token", 1, true) == nil,
+    "nor the Access Token, which is not durable at all")
+end)
+
+test("scenario 8: a token is held until it is nearly spent, not fetched every call", function()
+  local world, application = externalWorld()
+
+  world:pump(function()
+    world.nodes["harvester"]:call("test.identity", protocol.object())
+  end, "harvester")
+  local afterFirst = application.calls
+
+  world:pump(function()
+    world.nodes["harvester"]:call("test.identity", protocol.object())
+  end, "harvester")
+
+  assertEqual(application.calls - afterFirst, 1,
+    "a second call costs one Gateway request, not three")
+end)
+
+test("scenario 8: an operation the External Application refuses comes back as its code", function()
+  local world = fullWorld()
+  attach(world, newApplication({ refuse = true }))
+  local answer, code
+
+  world:pump(function()
+    answer, code = world.nodes["harvester"]:call("device.register", protocol.object())
+  end, "harvester")
+
+  assertTrue(answer == nil, "the call failed")
+  assertEqual(code, "forbidden_operation", "as the stable code the far end chose")
+end)
+
+test("scenario 8: an external call is NATted, so the answer finds the Computer that asked", function()
+  local world, application = externalWorld()
+
+  world:pump(function()
+    world.nodes["harvester"]:call("test.identity", protocol.object())
+  end, "harvester")
+
+  for _, request in ipairs(application.seen) do
+    if request.kind == "external_request" then
+      assertTrue(get(request.body, "source_flow_id") ~= nil,
+        "every external request carries the flow its router opened")
+    end
+  end
+  assertEqual(world.nodes["router-farm"].runtime.engine.flows:size(), 0,
+    "and every one of them closed")
+end)
+
+test("scenario 11: with the External Application stopped, only external calls fail", function()
+  local world = fullWorld()
+  local answer, code
+
+  world:pump(function()
+    answer, code = world.nodes["harvester"]:call("test.identity", protocol.object())
+  end, "harvester")
+
+  assertTrue(answer == nil, "the external call failed")
+  assertEqual(code, "gateway_unavailable",
+    "with a stable code rather than a timeout")
+
+  -- And the World is entirely unaffected.
+  local reply = world:ask("alex-pc", {
+    customer_network_id = "network-farm",
+    computer_id = world.bindings["harvester"].computer_id,
+  }, "harvester.status", protocol.object({ token = "t" }))
+  assertTrue(reply ~= nil and reply.payload ~= nil, "cross-network traffic still works")
+  assertEqual(get(reply.payload, "answered_by"), "harvester", "from the right Computer")
+end)
+
+--------------------------------------------------------------------------
+-- What the Central Server reports
+--------------------------------------------------------------------------
+
+test("a session that opens is shown the whole topology before anything else", function()
+  local world, application = externalWorld()
+
+  world.central:tick()
+
+  assertTrue(#application.seen > 0, "something was published")
+  assertEqual(application.seen[1].kind, "topology_snapshot",
+    "and the topology went first")
+  local snapshot = application.seen[1].body
+  local ok, problem = protocol.conformance.schema.validateBody("topology_snapshot", snapshot)
+  assertTrue(ok, "it is a valid topology_snapshot: " .. tostring(problem))
+  assertEqual(#get(snapshot, "isps"), 1, "the ISP is in it")
+  assertEqual(#get(snapshot, "routers"), 2, "and both Customer Networks")
+end)
+
+test("the topology is published once per session, not once per tick", function()
+  local world, application = externalWorld()
+
+  world.central:tick()
+  world.central:tick()
+  world.central:tick()
+
+  local snapshots = 0
+  for _, sent in ipairs(application.seen) do
+    if sent.kind == "topology_snapshot" then snapshots = snapshots + 1 end
+  end
+  assertEqual(snapshots, 1, "a World that has not changed is not re-sent")
+end)
+
+test("Traffic Events are batched with strictly increasing durable sequences", function()
+  local world, application = externalWorld()
+  world.central:tick()
+
+  -- Make the Central Server observe something worth reporting.
+  world:ask("alex-pc", {
+    customer_network_id = "network-farm",
+    computer_id = world.bindings["harvester"].computer_id,
+  }, "harvester.status", protocol.object({ token = "t" }))
+  world.central:tick()
+
+  local batches = {}
+  for _, sent in ipairs(application.seen) do
+    if sent.kind == "traffic_batch" then batches[#batches + 1] = sent.body end
+  end
+  assertTrue(#batches > 0, "the Central Server reported what it saw")
+
+  local previous = 0
+  for _, batch in ipairs(batches) do
+    local first, last = get(batch, "first_sequence"), get(batch, "last_sequence")
+    assertEqual(first, previous + 1, "sequences continue without a gap or a repeat")
+    assertTrue(last >= first, "and the range is the right way round")
+    assertEqual(last - first + 1, #get(batch, "events"), "and matches the event count")
+    local ok, problem = protocol.conformance.schema.validateBody("traffic_batch", batch)
+    assertTrue(ok, "each batch is valid: " .. tostring(problem))
+    previous = last
+  end
+
+  assertEqual(world.central:state().traffic_sequence, previous,
+    "and the sequence is durable, so a restart does not reissue one")
+end)
+
+test("no Traffic Event the Central Server reports carries a payload", function()
+  local world, application = externalWorld()
+  world.central:tick()
+  world:ask("alex-pc", {
+    customer_network_id = "network-farm",
+    computer_id = world.bindings["harvester"].computer_id,
+  }, "harvester.status", protocol.object({ token = "canary-9f3b" }))
+  world.central:tick()
+
+  for _, sent in ipairs(application.seen) do
+    if sent.kind == "traffic_batch" then
+      for _, event in ipairs(get(sent.body, "events")) do
+        for key, value in pairs(event) do
+          assertTrue(tostring(value):find("canary-9f3b", 1, true) == nil,
+            "a payload reached a Traffic Event through '" .. tostring(key) .. "'")
+        end
+      end
+    end
+  end
+end)
+
+--------------------------------------------------------------------------
 -- Credential revocation
 --------------------------------------------------------------------------
 

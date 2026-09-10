@@ -100,6 +100,21 @@ test pass while the thing it describes is broken.
 except)`: `fn` is the driver, `except` names the node the driver is speaking
 for, and every other node serves itself meanwhile.
 
+## Check that a regression test regresses
+
+A test that passes whether or not the code is right defends nothing. Before
+calling one done, **break the thing it covers and watch it fail** — comment out
+the guard, invert the condition, delete the branch — then put it back:
+
+```bash
+# edit the code, then
+make test-lua
+git checkout -- packages/craftnet-core/files/role_router.lua
+```
+
+Every milestone in this repository claims its regression tests fail without
+their fix. That claim is only worth making if someone checked.
+
 ## Adding an External Operation
 
 An operation is a **handler plus a policy** at the composition root. There is no

@@ -62,20 +62,18 @@ decoder**, so reading the catalog exercises the decoder before a single case
 runs. The catalog is authored to stay inside the wire limits for exactly that
 reason.
 
-### Two fixtures are Go-only
+### One fixture is Go-only
 
-`gateway/frames.json` and `tokens/access-token.json` list `go` alone as their
-consumer.
+`tokens/access-token.json` lists `go` alone as its consumer, and that is correct
+and permanent: CraftOS treats an Access Token as opaque, never verifies an
+Ed25519 signature, and never reads a claim out of one. There is nothing for Lua
+to replay.
 
-For the Access Token that is correct and permanent: CraftOS treats a token as
-opaque, never verifies an Ed25519 signature, and never reads a claim out of one.
-There is nothing for Lua to replay.
-
-For `gateway/frames.json` it is a **gap, not a decision**. Since Milestone 9 the
-Lua side has a Gateway codec of its own (`packages/craftnet-protocol/files/gateway.lua`)
-which is not held to these vectors, so the two ends of that socket are checked
-against each other only by inspection. Adding `lua` to that fixture's consumers
-and a replay routine to `catalog.lua` is worth doing.
+Everything else is replayed by both, `gateway/frames.json` included. Lua encodes
+the hello and must produce the same bytes Go did, decodes the welcome and every
+frame, and re-encodes each one back to the byte — so the two ends of a single
+WebSocket are held to one set of vectors rather than to each other by
+inspection.
 
 ## Regenerating
 

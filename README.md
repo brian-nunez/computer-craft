@@ -6,7 +6,7 @@ the Go External Application provides the controlled WebSocket gateway and
 operator dashboard.
 
 All nine implementation milestones are built. The automated half of the v1
-release gate passes: 253 Lua tests, the Go suite under `-race`, a 1,685-entity
+release gate passes: 294 Lua tests, the Go suite under `-race`, a 1,685-entity
 scale simulation over 10,000 seeded operations, a full restart matrix, and a
 malformed-input corpus. The gate itself is **not** met — no acceptance run has
 been performed in Minecraft. [The acceptance
