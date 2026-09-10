@@ -413,9 +413,9 @@ end)
 
 test("internal traffic carries on with no Gateway Session at all", function()
   local world = fullWorld()
-  -- No gateway adapter was ever wired: this is exactly what a stopped
-  -- craftnetd looks like from in world.
-  assertTrue(world.central.runtime.adapters.gateway == nil, "there is no Gateway")
+  -- The Gateway transport exists and has never reached anything: this is
+  -- exactly what a stopped craftnetd looks like from in world.
+  assertTrue(not world.central:gatewayStatus().ready, "there is no Gateway Session")
 
   -- Scenario 5: local delivery, entirely inside Home.
   local localReply = world:ask("alex-pc", {

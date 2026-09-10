@@ -627,6 +627,94 @@ function messages.service_request(engine, link, message, now, out)
   out:ok({ delivery = "remote", flow_id = flow.flow_id })
 end
 
+-- external_call carries one of this router's Computers out to the External
+-- Application. It is NATted exactly like any other remote request -- the flow
+-- this opens is what a reply retraces -- but it names no Customer Network,
+-- because the External Application is not one.
+--
+-- It only ever travels upward. The External Application never initiates into a
+-- World: it observes one, and it may ask the Central Server to disable a
+-- Customer Network. A frame of this kind arriving from the parent is not a call
+-- to serve, so it is refused rather than delivered.
+function messages.external_call(engine, link, message, now, out)
+  local state = engine.state
+  local body = message.body
+  local operation = get(body, "operation")
+  local bytes = engine:measure(body)
+
+  if link.direction == "parent" then
+    out:replyError(link.relationship_id, message.request_id, "inbound_denied",
+      "the External Application does not call into a Customer Network")
+    return out:fail("inbound_denied", "external_call may not arrive from upstream")
+  end
+
+  local binding = state.bindings[link.id]
+  if link.role ~= "computer" or not binding then
+    return out:fail("forbidden_operation", "only a bound Computer may send through this router")
+  end
+
+  if not engine.parentRelationshipId then
+    engine:record(out, eventBase(engine, {
+      direction = "outbound", kind = "external_call", operation = operation,
+      outcome = "upstream_unavailable", bytes = bytes, request_id = message.request_id,
+      computer_id = binding.computer_id,
+    }), now)
+    out:replyError(link.relationship_id, message.request_id, "upstream_unavailable",
+      "this router has no connection to its ISP")
+    return out:fail("upstream_unavailable", "no parent relationship")
+  end
+
+  local onwardRequestId = engine:allocateRequestId()
+  local flow = engine.flows:open({
+    relationship_id = engine.parentRelationshipId,
+    request_id = onwardRequestId,
+    reply_to_relationship_id = link.relationship_id,
+    reply_to_request_id = message.request_id,
+    computer_id = binding.computer_id,
+    local_address = binding.address,
+    service = operation,
+    role = "source",
+  }, now)
+  if not flow then
+    engine:record(out, eventBase(engine, {
+      direction = "outbound", kind = "external_call", operation = operation,
+      outcome = "busy", bytes = bytes, request_id = message.request_id,
+      computer_id = binding.computer_id,
+    }), now)
+    out:replyError(link.relationship_id, message.request_id, "busy",
+      "this router already holds its outstanding requests upstream")
+    return out:fail("busy", "the uplink is at capacity")
+  end
+  out:ephemeral("flow_opened", { flow_id = flow.flow_id, role = "source" })
+
+  -- The source is rebuilt from the authenticated session, exactly as it is for
+  -- a service_request. Everything else is the Computer's own: the operation it
+  -- named, its payload, and whichever credential that operation takes. A router
+  -- reads none of them, and carries none of them into a Traffic Event.
+  local onward = protocol.object({
+    source = protocol.object({
+      computer_id = binding.computer_id,
+      customer_network_id = state.customer_network_id,
+      local_address = binding.address,
+    }),
+    operation = operation,
+    payload = get(body, "payload"),
+    source_flow_id = flow.flow_id,
+  })
+  for _, field in ipairs({ "access_token", "device_credential", "registration_nonce" }) do
+    local value = get(body, field)
+    if value ~= nil then rawset(onward, field, value) end
+  end
+
+  out:send(engine.parentRelationshipId, "external_call", onward, onwardRequestId)
+  engine:record(out, eventBase(engine, {
+    direction = "outbound", kind = "external_call", operation = operation,
+    outcome = "delivered_external", bytes = bytes, request_id = message.request_id,
+    computer_id = binding.computer_id,
+  }), now)
+  out:ok({ delivery = "external", flow_id = flow.flow_id })
+end
+
 -- service_response completes a request in either direction.
 function messages.service_response(engine, link, message, now, out)
   local body = message.body

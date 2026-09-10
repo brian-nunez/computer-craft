@@ -5,14 +5,19 @@ model one Central Server, multiple ISPs, Customer Routers, and Computers, while
 the Go External Application provides the controlled WebSocket gateway and
 operator dashboard.
 
-All eight implementation milestones are built. The automated half of the v1
+All nine implementation milestones are built. The automated half of the v1
 release gate passes: 253 Lua tests, the Go suite under `-race`, a 1,685-entity
 scale simulation over 10,000 seeded operations, a full restart matrix, and a
-malformed-input corpus. The gate itself is **not** met — the in-world Gateway
-transport is not built, and no acceptance run has been performed in Minecraft.
-[The acceptance report](docs/implementation/acceptance/report-v0.1.0.md) says
-exactly what is proved and what is not, and this repository stays at
-`0.1.0-dev` until it is.
+malformed-input corpus. The gate itself is **not** met — no acceptance run has
+been performed in Minecraft. [The acceptance
+report](docs/implementation/acceptance/report-v0.1.0.md) says exactly what is
+proved and what is not, and this repository stays at `0.1.0-dev` until it is.
+
+[Milestone 9](docs/implementation/milestone-9.md) built the in-world leg of the
+external path, which the v1 gate had refused to tag a release without: a
+Computer names an External Operation with
+[`external_call`](docs/adr/0010-name-the-external-application-with-its-own-message-kind.md),
+and the Central Server holds a real `http.websocket` session to `craftnetd`.
 
 The complete design and delivery gates are indexed in [the CraftNet v1
 map](.scratch/craftnet-v1/map.md); milestone evidence is under
@@ -193,7 +198,8 @@ it reachable from another one.
 
 Once it is up, a router has `expose HOSTNAME SERVICE` (nothing is reachable from
 another network until it does) and `revoke HOSTNAME`. Every Computer has
-`craftnet status`, `craftnet resolve NAME`, and `craftnet call NAME SERVICE`.
+`craftnet status`, `craftnet resolve NAME`, and `craftnet call NAME SERVICE` —
+and `craftnet call api.craft OPERATION`, which is the External Application.
 
 [The setup guide](docs/operations/setup.md) is the whole procedure in order, and
 [the recovery guide](docs/operations/recovery.md) is organised by what you will
@@ -222,6 +228,12 @@ Which External Operations exist is an allowlist, and adding one is a handler
 plus a policy at the composition root — never a new route, a new session, or a
 proxy to an arbitrary URL. This release allows `device.register`, `token.issue`,
 `echo`, `time.now`, and `test.identity`.
+
+The Central Server reaches it over CC:Tweaked's `http.websocket`, which has to
+be enabled and allowed for that host — see [the setup
+guide](docs/operations/setup.md#let-the-central-server-reach-it). When it is not
+reachable, external calls give `gateway_unavailable` and everything inside the
+World carries on.
 
 `data/` is excluded by `.gitignore`.
 

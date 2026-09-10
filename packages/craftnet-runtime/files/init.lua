@@ -92,6 +92,9 @@ function runtimePackage.withPackages(packages)
       clock = function() return internal("adapter_clock").new() end,
       screen = function(target) return internal("adapter_screen").new(target) end,
       modem = function(options) return internal("adapter_modem").new(options) end,
+      -- The Gateway transport is the Central Server's alone, and the only file
+      -- in CraftNet that reaches for the HTTP API.
+      gateway = function(options) return internal("adapter_gateway").new(options) end,
     },
 
     limits = {

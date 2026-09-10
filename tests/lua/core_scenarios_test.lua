@@ -524,7 +524,7 @@ test("scenario 10: a command for an unknown Customer Network is refused out loud
   assertTrue(ok, "a rejection is a valid command_result: " .. tostring(problem))
 end)
 
-test("scenario 10: the Gateway carries only administrative commands inward", function()
+test("scenario 10: the Gateway carries only answers and commands inward", function()
   local sim = build()
   sim:reset()
   local outcome = sim:input("central", {
@@ -536,8 +536,17 @@ test("scenario 10: the Gateway carries only administrative commands inward", fun
   assertTrue(not outcome.result.ok, "an unknown action is refused")
   assertEqual(outcome.result.code, "forbidden_operation", "code")
 
+  -- An answer is carried inward, but only for a call this World actually made.
+  -- One that matches nothing is not invented into an answer for anybody.
+  local unmatched = sim:input("central", {
+    kind = "gateway_frame", frame_kind = "external_response",
+    request_id = "central-overworld-r999", body = core.object({ payload = core.object() }),
+  })
+  assertTrue(not unmatched.result.ok, "an answer to nothing is refused")
+  assertEqual(unmatched.result.code, "nat_flow_missing", "code")
+
   local refused = sim:input("central", {
-    kind = "gateway_frame", frame_kind = "external_response", body = core.object({}),
+    kind = "gateway_frame", frame_kind = "dns_query", body = core.object({}),
   })
   assertTrue(not refused.result.ok, "nothing else arrives inward in v1")
   assertEqual(refused.result.code, "forbidden_operation", "code")

@@ -90,6 +90,10 @@ a stand-in. What the tests drive is the same handler `craftnetd serve` mounts.
 **The in-world leg of the external path is not built, and it needs a decision
 the tickets do not settle.**
 
+> Settled in [Milestone 9](milestone-9.md): a Computer names an External
+> Operation with its own message kind, `external_call`. See [ADR
+> 0010](../adr/0010-name-the-external-application-with-its-own-message-kind.md).
+
 Ticket 9 says a Computer's External Operation travels "through its complete
 CraftNet ancestry", and `external_request.body` carries a `source_flow_id` —
 which means the request passed through a Customer Router's NAT. But ticket 16

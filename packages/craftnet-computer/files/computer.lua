@@ -14,6 +14,10 @@ local computer = {}
 
 computer.LAN_DISCOVERY_CHANNEL = 42002
 
+-- Where the Device Credential is kept. It is a secret, so it lives in the
+-- secret store and never in a state snapshot.
+computer.DEVICE_CREDENTIAL_REF = "device-credential"
+
 local Computer = {}
 Computer.__index = Computer
 
@@ -228,6 +232,151 @@ end
 
 function Computer:serve(timeoutMs)
   return self.runtime:pump(timeoutMs)
+end
+
+-- await serves this Computer until the thing it just asked for comes back. A
+-- CraftNet call is one request and one answer; there is nothing to poll.
+function Computer:await(options)
+  options = options or {}
+  for _ = 1, options.attempts or 60 do
+    local outcome = self.runtime:pump(options.timeout_ms or 200)
+    if outcome and outcome.result then
+      local result = outcome.result
+      if result.ok == false then return nil, result.code, result.message end
+      if result.payload ~= nil or result.address ~= nil or result.canonical_name ~= nil then
+        return result
+      end
+    end
+  end
+  return nil, "request_timeout", "no answer arrived"
+end
+
+--------------------------------------------------------------------------
+-- The External Application
+--------------------------------------------------------------------------
+
+-- A token is refused one second past its life. A Computer stops trusting its
+-- own a little early rather than discovering at the far end that it was late,
+-- and it measures the life as a duration: the wall clock is not something
+-- CraftNet security is ever allowed to depend on.
+local TOKEN_MARGIN_MS = 5000
+
+-- externalCall names an External Operation on the in-world wire. It carries no
+-- destination, because `api.craft` is not a Customer Network; the message kind
+-- is the destination. The Customer Router NATs it, the ISP carries it, and the
+-- Central Server is the only role that holds a Gateway Session.
+function Computer:externalCall(operation, payload, credential)
+  credential = credential or {}
+  return self.runtime:submit({
+    kind = "external_call",
+    operation = operation,
+    payload = payload or protocol.object(),
+    access_token = credential.access_token,
+    device_credential = credential.device_credential,
+    registration_nonce = credential.registration_nonce,
+  })
+end
+
+-- registerDevice presents this Computer's verified ancestry and keeps the
+-- Device Credential that comes back. There is no secret to present: every hop
+-- between here and the External Application derived who is asking rather than
+-- believing it, and that path is the attestation.
+--
+-- The nonce is derived from the LAN Credential and a durable counter, never
+-- drawn from math.random, and the counter is committed before the nonce is
+-- sent, so a restart cannot produce the same one twice.
+function Computer:registerDevice()
+  local state = self:state()
+  local credential = self.secrets:get("lan-credential")
+  if not credential then
+    return nil, "authentication_failed", "this Computer has no LAN Credential"
+  end
+
+  state.registration_generation = (state.registration_generation or 0) + 1
+  self.runtime.store:save(state, self.clock:now())
+  local nonce = protocol.registration.nonce(credential, state.registration_generation)
+
+  local sent = self:externalCall("device.register", protocol.object(),
+    { registration_nonce = nonce })
+  if not sent.result.ok then return nil, sent.result.code, sent.result.message end
+
+  local answer, code, problem = self:await()
+  if not answer then return nil, code, problem end
+
+  local issued = rawget(answer.payload or protocol.object(), "device_credential")
+  if type(issued) ~= "string" or issued == "" then
+    return nil, "internal_error", "the External Application issued no Device Credential"
+  end
+  local stored, storeProblem = self.secrets:put(computer.DEVICE_CREDENTIAL_REF, issued)
+  if not stored then return nil, "internal_error", storeProblem end
+  return { device_id = rawget(answer.payload, "device_id") }
+end
+
+-- accessToken exchanges the Device Credential for a two-minute Access Token,
+-- and holds the one it has until it is nearly spent. The token itself is
+-- opaque here: CraftOS never reads a claim out of it, and never decides
+-- anything on what it might say.
+function Computer:accessToken()
+  local held = self.token
+  if held and (self.clock:now() - held.issued_at_ms)
+    < (protocol.limits.ACCESS_TOKEN_SECONDS * 1000) - TOKEN_MARGIN_MS then
+    return held.access_token
+  end
+
+  local credential = self.secrets:get(computer.DEVICE_CREDENTIAL_REF)
+  if not credential then
+    return nil, "authentication_failed", "this Computer has not registered a device"
+  end
+
+  local issuedAt = self.clock:now()
+  local sent = self:externalCall("token.issue", protocol.object(),
+    { device_credential = credential })
+  if not sent.result.ok then return nil, sent.result.code, sent.result.message end
+
+  local answer, code, problem = self:await()
+  if not answer then return nil, code, problem end
+
+  local token = rawget(answer.payload or protocol.object(), "access_token")
+  if type(token) ~= "string" or token == "" then
+    return nil, "internal_error", "the External Application issued no Access Token"
+  end
+  self.token = { access_token = token, issued_at_ms = issuedAt }
+  return token
+end
+
+-- call is the whole external path as one thing an application asks for: a
+-- device registered once, a token held until it is nearly spent, and the
+-- operation itself. A caller that has never registered does not have to know
+-- that it has not.
+function Computer:call(operation, payload)
+  if operation == "device.register" then
+    return self:registerDevice()
+  end
+
+  if not self.secrets:get(computer.DEVICE_CREDENTIAL_REF) then
+    local registered, code, problem = self:registerDevice()
+    if not registered then return nil, code, problem end
+  end
+  if operation == "token.issue" then
+    local token, code, problem = self:accessToken()
+    if not token then return nil, code, problem end
+    return { access_token = token }
+  end
+
+  local token, code, problem = self:accessToken()
+  if not token then return nil, code, problem end
+
+  local sent = self:externalCall(operation, payload, { access_token = token })
+  if not sent.result.ok then return nil, sent.result.code, sent.result.message end
+
+  local answer, failure, detail = self:await()
+  if not answer then
+    -- A token this Computer still believed in was refused. Dropping it means
+    -- the next call fetches a fresh one instead of failing the same way again.
+    if failure == "access_token_expired" then self.token = nil end
+    return nil, failure, detail
+  end
+  return answer.payload or protocol.object()
 end
 
 function Computer:tick()

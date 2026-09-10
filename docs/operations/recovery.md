@@ -61,8 +61,18 @@ working**: local traffic, cross-network traffic, DNS, and routing never needed
 the External Application. Only External Operations fail, with
 `gateway_unavailable`.
 
-Check that `craftnetd serve` is running and reachable at the URL the Central
-Server was given, then restart the Central Server.
+Check, in this order:
+
+1. `craftnetd serve` is running and reachable at the URL the Central Server was
+   given.
+2. CC:Tweaked's HTTP API is enabled and that host is allowed — see
+   [Setup](setup.md#let-the-central-server-reach-it). A blocked host looks
+   exactly like a stopped application from in world.
+3. The Gateway Credential the Central Server holds is the one this World was
+   provisioned with. A wrong one is refused, not retried into working.
+
+The Central Server reconnects on its own, under backoff, up to every 30 seconds.
+Restarting it is not usually necessary; it will not hurt.
 
 What the dashboard shows meanwhile is the last thing that World reported. It is
 not wrong; it is old, and it says so.

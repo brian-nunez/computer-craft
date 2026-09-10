@@ -151,6 +151,24 @@
       "transport": "operational"
     },
     {
+      "body": "{\"access_token\":\"opaque.bearer.token\",\"operation\":\"market.quote\",\"payload\":{\"symbol\":\"wheat\"},\"source\":{\"computer_id\":\"cmp-harvester\",\"customer_network_id\":\"net-farm\",\"local_address\":\"192.168.1.20\"}}",
+      "kind": "external_call",
+      "name": "external_call for an ordinary operation",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"operation\":\"device.register\",\"payload\":{},\"registration_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\",\"source\":{\"computer_id\":\"cmp-harvester\",\"customer_network_id\":\"net-farm\",\"local_address\":\"192.168.1.20\"}}",
+      "kind": "external_call",
+      "name": "external_call registering a device",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"device_credential\":\"opaque-device-credential\",\"operation\":\"token.issue\",\"payload\":{},\"source\":{\"computer_id\":\"cmp-harvester\",\"customer_network_id\":\"net-farm\",\"local_address\":\"192.168.1.20\"},\"source_flow_id\":\"flow-a3\"}",
+      "kind": "external_call",
+      "name": "external_call issuing a token, natted",
+      "transport": "operational"
+    },
+    {
       "body": "{\"code\":\"route_not_found\",\"details\":{\"customer_network_id\":\"net-home\"},\"message\":\"That network is not reachable right now.\",\"retryable\":false}",
       "kind": "error",
       "name": "error with details",

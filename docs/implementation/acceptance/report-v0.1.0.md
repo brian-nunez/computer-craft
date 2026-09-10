@@ -119,20 +119,22 @@ the 65th is busy".
 
 ## What is not proved
 
-**The in-world Gateway transport does not exist.** The Central Server has an
-outbound Gateway effect and, since Milestone 7, an inbound `gateway_frame`
-input. What is missing is the adapter between them and a WebSocket: a
-CC:Tweaked `http.websocket` client that opens the session, sends hello,
-heartbeats, batches traffic, and reconnects.
+**The in-world Gateway transport was built in [Milestone
+9](../milestone-9.md).** A Computer names an External Operation with
+`external_call` ([ADR
+0010](../../adr/0010-name-the-external-application-with-its-own-message-kind.md)),
+and the Central Server holds a real `http.websocket` session that opens with
+hello, heartbeats, batches traffic, and reconnects under backoff. **Scenario 8
+is no longer blocked.**
 
-This blocks **scenario 8** outright and makes **scenarios 9 and 10** two halves
-that meet at a defined seam rather than one path. Both halves are tested; they
-have never run as one pair of processes.
+What it has not done is run. The two ends have still never been one pair of
+processes: what proves the path is a stand-in for `craftnetd` on the same seam
+the real adapter uses. Scenarios 8, 9, and 10 stand unrun rather than blocked.
 
-It is the same missing piece as [Milestone 6's open
-question](../milestone-6.md#deliberately-deferred) about how a Computer names an
-External Operation on the in-world wire, and it wants deciding properly rather
-than improvising at a release gate.
+**Subordinate roles do not relay Traffic Events upstream.** A Customer Router
+and an ISP record their own; nothing carries them to the Central Server. The
+traffic **scenario 9** shows will therefore be the Central Server's view. See
+[Milestone 9](../milestone-9.md) for why that was left rather than improvised.
 
 **No in-world run has been performed.** Every result above comes from Lua on a
 real interpreter and Go under `-race`. None of it has met Ender modems, real
@@ -149,9 +151,10 @@ checklist](milestone-7-dashboard.md).
 
 ## What has to happen before v0.1.0 is tagged
 
-1. Build the in-world Gateway transport, or explicitly ship v0.1.0 with the
-   external path documented as unavailable in world. That is a decision, and it
-   belongs to whoever owns the release.
+1. ~~Build the in-world Gateway transport~~ — done in [Milestone
+   9](../milestone-9.md). Decide whether shipping v0.1.0 without upstream
+   Traffic Event relay is acceptable, or hold the tag for it. That is a
+   decision, and it belongs to whoever owns the release.
 2. Run [the in-world checklist](milestone-8-in-world.md) from clean Computers
    and a clean data directory, and fill in the results here.
 3. Run [the dashboard checklist](milestone-7-dashboard.md).
