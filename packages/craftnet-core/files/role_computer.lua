@@ -17,6 +17,8 @@ local handlers = {
   link_down = shared.link_down,
   tick = shared.tick,
   message = shared.message,
+  effect_result = shared.effect_result,
+  reconcile = shared.reconcile,
 }
 
 local get = rawget
@@ -55,6 +57,28 @@ function handlers.configure(engine, input, now, out)
 
   out:durable("configured", { computer_id = state.computer_id, address = state.address })
   out:ok({ computer_id = state.computer_id, address = state.address })
+end
+
+--------------------------------------------------------------------------
+-- Reconciliation
+--------------------------------------------------------------------------
+
+-- applyConfiguration takes the router's authoritative record. The router owns
+-- every field of a Computer's network configuration, so all of it is accepted.
+function handlers.applyConfiguration(engine, configuration, out)
+  local address = rawget(configuration, "address")
+  if not protocol.validate.customerAddress(address or "") then
+    return nil, "invalid_message", "a Computer configuration needs an RFC 1918 address"
+  end
+  local state = engine.state
+  state.computer_id = rawget(configuration, "computer_id") or state.computer_id
+  state.hostname = rawget(configuration, "hostname") or state.hostname
+  state.address = address
+  state.customer_network_id = rawget(configuration, "customer_network_id") or state.customer_network_id
+  state.router_address = rawget(configuration, "router_address") or state.router_address
+  state.dns_address = rawget(configuration, "dns_address") or state.dns_address
+  out:ephemeral("configuration_applied", { address = state.address })
+  return true
 end
 
 --------------------------------------------------------------------------

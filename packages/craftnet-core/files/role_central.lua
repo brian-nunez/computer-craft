@@ -18,6 +18,7 @@ local handlers = {
   link_down = shared.link_down,
   tick = shared.tick,
   message = shared.message,
+  effect_result = shared.effect_result,
 }
 
 local get = rawget
@@ -160,6 +161,27 @@ end
 function handlers.status_of(engine, input, now, out)
   local status = engine.state.network_status[input.customer_network_id] or "enabled"
   out:ok({ customer_network_id = input.customer_network_id, status = status })
+end
+
+-- configurationFor builds what the Central Server assigns to one ISP: its
+-- identity, its name, its Provider Allocations, and its Operational Channel.
+function handlers.configurationFor(engine, link)
+  local isp = engine.state.isps[link.id]
+  if not isp then
+    return nil, "name_not_found", "that ISP is not registered"
+  end
+  local allocations = protocol.array()
+  for index, allocation in ipairs(isp.provider_allocations) do
+    rawset(allocations, index, protocol.object({
+      first = allocation.first, last = allocation.last,
+    }))
+  end
+  return protocol.object({
+    isp_id = isp.isp_id,
+    isp_name = isp.isp_name,
+    provider_allocations = allocations,
+    operational_channel = isp.operational_channel or 0,
+  })
 end
 
 --------------------------------------------------------------------------

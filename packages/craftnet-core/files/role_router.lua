@@ -19,6 +19,8 @@ local handlers = {
   link_down = shared.link_down,
   tick = shared.tick,
   message = shared.message,
+  effect_result = shared.effect_result,
+  reconcile = shared.reconcile,
 }
 
 local get = rawget
@@ -193,6 +195,59 @@ function handlers.expose_service(engine, input, now, out)
     exposed = state.exposed[input.computer_id][input.service],
   })
   out:ok({ computer_id = input.computer_id, service = input.service })
+end
+
+--------------------------------------------------------------------------
+-- Reconciliation
+--------------------------------------------------------------------------
+
+-- configurationFor builds what this router assigns to one of its Computers.
+-- The router owns every field of it outright.
+function handlers.configurationFor(engine, link)
+  local state = engine.state
+  local binding = state.bindings[link.id]
+  if not binding then
+    return nil, "name_not_found", "that Computer has no binding on this network"
+  end
+  return protocol.object({
+    computer_id = binding.computer_id,
+    hostname = binding.hostname,
+    address = binding.address,
+    customer_network_id = state.customer_network_id,
+    router_address = state.router_address,
+    dns_address = state.dns_address,
+  })
+end
+
+-- The fields an ISP owns on a Customer Router. Everything else in a router
+-- configuration -- the LAN address, the pool, the LAN channel -- belongs to the
+-- router itself, so a snapshot from upstream may not move it.
+local PARENT_OWNED = {
+  customer_network_id = true,
+  customer_network_name = true,
+  provider_address = true,
+  isp_id = true,
+}
+
+-- applyConfiguration takes only what the ISP is authoritative for. A snapshot
+-- that tries to rewrite this router's own pool is not merged and not obeyed;
+-- each owner wins for the state the authority model assigns to it.
+function handlers.applyConfiguration(engine, configuration, out)
+  if not protocol.validate.identifier(rawget(configuration, "customer_network_id") or "") then
+    return nil, "invalid_message", "a router configuration needs a Customer Network identity"
+  end
+  local state = engine.state
+  local ignored = {}
+  for field, value in pairs(configuration) do
+    if PARENT_OWNED[field] then
+      state[field] = value
+    else
+      ignored[#ignored + 1] = field
+    end
+  end
+  table.sort(ignored)
+  out:ephemeral("configuration_fields_ignored", { fields = ignored })
+  return true
 end
 
 --------------------------------------------------------------------------

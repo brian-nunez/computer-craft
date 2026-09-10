@@ -3,10 +3,18 @@
   "version": "0.1.0",
   "dependencies": {
     "craftnet-core": "^0.1.0",
-    "craftnet-protocol": "^0.1.0"
+    "craftnet-protocol": "^0.1.0",
+    "networking": "^1.0.0"
   },
   "files": {
-    "init.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/init.lua"
+    "init.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/init.lua",
+    "runtime.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/runtime.lua",
+    "snapshot.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/snapshot.lua",
+    "connectivity.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/connectivity.lua",
+    "screen.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/screen.lua",
+    "adapter_storage.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/adapter_storage.lua",
+    "adapter_clock.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/adapter_clock.lua",
+    "adapter_screen.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/adapter_screen.lua",
+    "adapter_modem.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/adapter_modem.lua"
   }
 }
-
