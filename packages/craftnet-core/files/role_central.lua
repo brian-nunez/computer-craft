@@ -440,6 +440,55 @@ function messages.dns_query(engine, link, message, now, out)
 end
 
 --------------------------------------------------------------------------
+-- The External Application
+--------------------------------------------------------------------------
+
+-- external_request hands one call to the Gateway. The Central Server is the
+-- only role that ever opens a connection outward, and it stamps the ancestry
+-- from what it actually knows rather than from anything the caller wrote.
+--
+-- When there is no Gateway Session the call fails with gateway_unavailable and
+-- nothing else changes: internal addressing, DNS, and cross-network traffic all
+-- carry on, because none of them ever needed the External Application.
+function handlers.external_request(engine, input, now, out)
+  local state = engine.state
+  if not state.world_id then
+    return out:fail("internal_error", "the Central Server is not configured yet")
+  end
+  if not protocol.validate.operationName(input.operation or "") then
+    return out:fail("invalid_message", "an operation name is required")
+  end
+
+  local route = state.routes[input.customer_network_id]
+  if not route then
+    return out:fail("route_not_found", "no route to that Customer Network")
+  end
+  if (state.network_status[input.customer_network_id] or "enabled") == "disabled" then
+    return out:fail("network_disabled", "that Customer Network is disabled")
+  end
+
+  local body = protocol.object({
+    ancestry = protocol.object({
+      world_id = state.world_id,
+      isp_id = route.isp_id,
+      customer_network_id = route.customer_network_id,
+      router_id = route.router_id,
+      computer_id = input.computer_id,
+      local_address = input.local_address,
+    }),
+    source_flow_id = input.source_flow_id or "flow-external",
+    operation = input.operation,
+    payload = input.payload or protocol.object(),
+  })
+  if input.access_token then rawset(body, "access_token", input.access_token) end
+  if input.device_credential then rawset(body, "device_credential", input.device_credential) end
+  if input.registration_nonce then rawset(body, "registration_nonce", input.registration_nonce) end
+
+  out:gateway("external_request", body, { request_id = input.request_id })
+  out:ok({ operation = input.operation, forwarded = true })
+end
+
+--------------------------------------------------------------------------
 -- Topology
 --------------------------------------------------------------------------
 

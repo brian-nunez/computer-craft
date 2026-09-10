@@ -5,14 +5,13 @@ model one Central Server, multiple ISPs, Customer Routers, and Computers, while
 the Go External Application provides the controlled WebSocket gateway and
 operator dashboard.
 
-Implementation Milestone 5 is complete in simulation: the whole hierarchy now
-exists. `craftnet-central` and `craftnet-isp` join the Customer Networks
-together, one-time enrollment tokens carry an Operator from one Computer to the
-next, and traffic crosses between networks through the Central Server. Its
-in-world acceptance run has not been performed yet — see
-[the checklist](docs/implementation/acceptance/milestone-5-in-world.md). The Go
-External Application intentionally begins in Milestone 6. The complete design
-and delivery gates are indexed in
+Implementation Milestone 6 is complete: `craftnetd` is a real application. It
+provisions Worlds, serves one Gateway Session per World over a WebSocket, issues
+Device Credentials and two-minute Access Tokens, and stores everything in SQLite.
+The Operator dashboard intentionally begins in Milestone 7, and the in-world
+acceptance runs for Milestones 4 and 5 have still not been performed — see
+[the checklists](docs/implementation/acceptance/). The complete design and
+delivery gates are indexed in
 [the CraftNet v1 map](.scratch/craftnet-v1/map.md), and completed-gate evidence
 is recorded under [`docs/implementation/`](docs/implementation/).
 
@@ -32,7 +31,7 @@ local feedback.
 
 ## Development commands
 
-Run the complete Milestone 5 gate from the repository root:
+Run the complete Milestone 6 gate from the repository root:
 
 ```bash
 make test
@@ -165,10 +164,13 @@ on its own and which is what every later reconnect uses.
 
 ## Building the whole World
 
-Provision the root secrets outside Minecraft, then carry them in:
+Provision the World in the External Application, then carry the values in. They
+are shown exactly once: afterwards the application holds only digests.
 
 ```bash
-cd external && go run ./cmd/craftnetprov -out ../data/world.json
+cd external
+go run ./cmd/craftnetd provision -world world-overworld -central central-main
+go run ./cmd/craftnetd serve
 ```
 
 | Computer | Install | Then run |
@@ -185,18 +187,30 @@ counters it has spent.
 A Customer Network works perfectly well without an ISP. `uplink` is what makes
 it reachable from another one.
 
-## Provisioning a development World
+## The External Application
 
-The External Application owns the root secrets. Generate a development World Key
-and Gateway Credential before running any CraftOS role, so that nothing in world
-invents a root secret or reuses a fixture credential:
+[`external/`](external/) is one Go binary: `craftnetd`. It serves the Central
+Server's Gateway, the operator interface, and (from Milestone 7) the embedded
+dashboard, on one origin and out of one SQLite file.
 
 ```bash
-cd external && go run ./cmd/craftnetprov -out ../data/world.json
+cd external
+go run ./cmd/craftnetd provision -world world-overworld -central central-main
+go run ./cmd/craftnetd serve -listen 127.0.0.1:8080
 ```
 
-The bundle is written with owner-only permissions and is never overwritten in
-place. `data/` is already excluded by `.gitignore`.
+A World Key, a Gateway Credential, and a Device Credential are stored as
+digests only, so a database that leaks tells an attacker nothing it can present.
+An Access Token is an Ed25519 JWT that lives two minutes and is checked against
+the exact CraftNet ancestry it arrived on: a valid token presented from another
+Customer Network is refused.
+
+Which External Operations exist is an allowlist, and adding one is a handler
+plus a policy at the composition root — never a new route, a new session, or a
+proxy to an arbitrary URL. This release allows `device.register`, `token.issue`,
+`echo`, `time.now`, and `test.identity`.
+
+`data/` is excluded by `.gitignore`.
 
 ## Repository layout
 
