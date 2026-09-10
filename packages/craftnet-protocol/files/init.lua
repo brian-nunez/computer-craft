@@ -78,6 +78,29 @@ protocol.errors = errors
 protocol.limits = limits
 
 --------------------------------------------------------------------------
+-- Wire vocabulary
+--------------------------------------------------------------------------
+
+-- This package owns what a CraftNet identifier, name, and address are. The
+-- predicates are public so that craftnet-core can check a value against the
+-- wire's own rules instead of carrying a second copy of them that could drift.
+-- They answer questions about values; they never validate a whole message.
+protocol.validate = {
+  identifier = schema.scalars.id,
+  normalizedName = schema.scalars.normalized_name,
+  displayName = schema.scalars.display_name,
+  operationName = schema.scalars.operation_name,
+  nonce = schema.scalars.nonce,
+  channel = schema.scalars.channel,
+  revision = schema.scalars.revision,
+  customerAddress = schema.scalars.customer_address,
+  providerAddress = schema.scalars.provider_address,
+  role = schema.scalars.role,
+  connectivityState = schema.scalars.connectivity_state,
+  networkStatus = schema.scalars.network_status,
+}
+
+--------------------------------------------------------------------------
 -- Conformance surface
 --------------------------------------------------------------------------
 

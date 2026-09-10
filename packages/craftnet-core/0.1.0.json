@@ -1,9 +1,20 @@
 {
   "name": "craftnet-core",
   "version": "0.1.0",
-  "dependencies": {},
+  "dependencies": {
+    "craftnet-protocol": "^0.1.0"
+  },
   "files": {
-    "init.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-core/files/init.lua"
+    "init.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-core/files/init.lua",
+    "engine.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-core/files/engine.lua",
+    "outcome.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-core/files/outcome.lua",
+    "ipv4.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-core/files/ipv4.lua",
+    "names.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-core/files/names.lua",
+    "events.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-core/files/events.lua",
+    "flows.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-core/files/flows.lua",
+    "role_computer.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-core/files/role_computer.lua",
+    "role_router.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-core/files/role_router.lua",
+    "role_isp.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-core/files/role_isp.lua",
+    "role_central.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-core/files/role_central.lua"
   }
 }
-

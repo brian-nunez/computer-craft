@@ -23,6 +23,7 @@ local PUBLIC_SURFACE = {
   parentSession = "function",
   errors = "table",
   limits = "table",
+  validate = "table",
   conformance = "table",
   internal = "function",
 }
