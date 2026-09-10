@@ -19,6 +19,17 @@ Computer names an External Operation with
 [`external_call`](docs/adr/0010-name-the-external-application-with-its-own-message-kind.md),
 and the Central Server holds a real `http.websocket` session to `craftnetd`.
 
+**[The documentation index](docs/README.md)** says which document answers which
+question. The ones most people want:
+
+| | |
+|---|---|
+| [Architecture](docs/architecture.md) | how the pieces fit, and what a request actually does |
+| [Setup](docs/operations/setup.md) · [Recovery](docs/operations/recovery.md) | building a World, and fixing one |
+| [The v1 wire](docs/protocol/v1.md) | the protocol, in prose |
+| [`CONTEXT.md`](CONTEXT.md) | what every CraftNet word means, and what not to call it |
+| [Contributing](docs/contributing.md) · [`AGENTS.md`](AGENTS.md) | the gate, the test harnesses, and the conventions this repo enforces |
+
 The complete design and delivery gates are indexed in [the CraftNet v1
 map](.scratch/craftnet-v1/map.md); milestone evidence is under
 [`docs/implementation/`](docs/implementation/), and [the release
@@ -279,6 +290,11 @@ packages/                 ccpm Lua packages and immutable manifests
 spec/protocol/v1/         cross-language protocol fixture catalog
 tests/lua/                portable Lua test runner, support, and suites
 scripts/                  local and CI entry points
+AGENTS.md                 conventions this repo enforces
+CONTEXT.md                the domain vocabulary
+docs/architecture.md      how the pieces fit today
+docs/contributing.md      the gate, the test harnesses, extension points
+docs/protocol/v1.md       the v1 wire in prose
 docs/adr/                 accepted architecture decisions
 docs/operations/          setup and recovery, for whoever runs it
 docs/releases/            release notes
