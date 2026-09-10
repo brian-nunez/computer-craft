@@ -10,6 +10,8 @@
     "init.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/init.lua",
     "runtime.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/runtime.lua",
     "snapshot.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/snapshot.lua",
+    "secrets.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/secrets.lua",
+    "links.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/links.lua",
     "connectivity.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/connectivity.lua",
     "screen.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/screen.lua",
     "adapter_storage.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/adapter_storage.lua",

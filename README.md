@@ -5,13 +5,13 @@ model one Central Server, multiple ISPs, Customer Routers, and Computers, while
 the Go External Application provides the controlled WebSocket gateway and
 operator dashboard.
 
-Implementation Milestone 3 is complete: the v1 wire and its authentication exist
-in both languages, `craftnet-core` decides what CraftNet does as pure state
-transitions, and `craftnet-runtime` now runs those decisions on a Computer —
-durable snapshots, Connectivity State, reconnect backoff, and effect execution.
-The setup and join wizards that let an Operator build a real Customer Network
-intentionally begin in Milestone 4. The complete design and delivery gates are
-indexed in
+Implementation Milestone 4 is complete in simulation: an Operator can now build
+a Customer Network. `craftnet-router` and `craftnet-computer` add the setup and
+join wizards, LAN Password admission, local DNS, and local traffic on top of the
+three shared packages. Its in-world acceptance run has not been performed yet —
+see [the checklist](docs/implementation/acceptance/milestone-4-in-world.md).
+Traffic between Customer Networks intentionally begins in Milestone 5. The
+complete design and delivery gates are indexed in
 [the CraftNet v1 map](.scratch/craftnet-v1/map.md), and completed-gate evidence
 is recorded under [`docs/implementation/`](docs/implementation/).
 
@@ -31,7 +31,7 @@ local feedback.
 
 ## Development commands
 
-Run the complete Milestone 3 gate from the repository root:
+Run the complete Milestone 4 gate from the repository root:
 
 ```bash
 make test
@@ -139,6 +139,29 @@ about it rather than vanishing inside an adapter.
 `tests/lua/support/fakes.lua` supplies storage, clock, links, screen, and
 gateway adapters that a test can corrupt, fail, or freeze at will.
 
+## Building a Customer Network
+
+On the Computer that will be the router:
+
+```text
+ccpm install craftnet-router
+```
+
+Then run the package's `setup` program. It asks for the network name, the
+router's own address, the pool to hand out, the LAN channel, and a LAN Password,
+checking each answer as it is typed. Start it with `startup`.
+
+On each Computer that will join:
+
+```text
+ccpm install craftnet-computer
+```
+
+Run `setup`, give it a hostname and the LAN Password, and it comes back with its
+address, its default gateway, and its DNS. The password is used exactly once:
+what is kept is a LAN Credential unique to that Computer, which can be revoked
+on its own and which is what every later reconnect uses.
+
 ## Provisioning a development World
 
 The External Application owns the root secrets. Generate a development World Key
@@ -192,17 +215,17 @@ local engine = core.newEngine({ role = "router", state = saved })
 ```
 
 `craftnet-runtime` runs one configured role: the CraftOS event loop, the modem
-adapter over the `networking` package, durable snapshots, Connectivity State,
-and reconnect backoff.
+transport over the `networking` package, the session-carrying links adapter,
+durable snapshots, a separate secret store, Connectivity State, and reconnect
+backoff.
 
 ```lua
 local runtime = dofile("/.ccpm/packages/craftnet-runtime/0.1.0/init.lua")
   .withPackages({ protocol = protocol, core = core })
 ```
 
-The four role packages — `craftnet-computer`, `craftnet-router`, `craftnet-isp`,
-and `craftnet-central` — are composition roots over these three, and arrive in
-Milestones 4 and 5.
+`craftnet-router` and `craftnet-computer` are composition roots over those
+three. `craftnet-isp` and `craftnet-central` arrive in Milestone 5.
 
 ## ccpm
 
@@ -224,9 +247,8 @@ wget https://raw.githubusercontent.com/brian-nunez/computer-craft/main/ccpm.lua 
 ```text
 ccpm install networking
 ccpm install peripheral-discovery ^1.0.0
-ccpm install craftnet-protocol ^0.1.0
-ccpm install craftnet-core ^0.1.0
-ccpm install craftnet-runtime ^0.1.0
+ccpm install craftnet-router
+ccpm install craftnet-computer
 ccpm list
 ```
 

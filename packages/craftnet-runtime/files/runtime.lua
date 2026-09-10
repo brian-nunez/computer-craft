@@ -13,6 +13,7 @@
 local internal = ...
 local protocol = internal("protocol")
 local snapshot = internal("snapshot")
+local secrets = internal("secrets")
 local connectivity = internal("connectivity")
 local screen = internal("screen")
 
@@ -52,6 +53,13 @@ function runtime.new(core, options)
       storage = requireAdapter(adapters, "storage", { "read" }),
       path = options.path or ("craftnet/" .. options.role),
       role = options.role,
+    }),
+    -- Secrets live in their own file. A state snapshot never contains a secret
+    -- value, so it can be read, relayed, projected, and shown without anyone
+    -- having to remember which field was sensitive.
+    secretStore = secrets.new({
+      storage = adapters.storage,
+      path = (options.path or ("craftnet/" .. options.role)) .. ".secrets",
     }),
     monitor = connectivity.new(options.connectivity),
     application = options.application or {},
@@ -98,6 +106,12 @@ end
 
 function Runtime:state()
   return self.engine and self.engine.state
+end
+
+-- secrets is the durable credential store. Configuration refers to a secret by
+-- name; only this store ever holds the value.
+function Runtime:secrets()
+  return self.secretStore
 end
 
 function Runtime:revision()
@@ -266,6 +280,21 @@ function Runtime:pump(timeoutMs)
     return self:submit({ kind = "link_down", relationship_id = event.relationship_id })
   end
   return self:submit(event)
+end
+
+-- drain settles every lifecycle event the links adapter has queued. A wizard
+-- calls it after establishing a relationship so the engine knows about it
+-- before control returns, rather than on some later trip round the loop.
+function Runtime:drain()
+  local links = self.adapters.links
+  if type(links.pending) ~= "function" then return 0 end
+  local processed = 0
+  while links:pending() > 0 do
+    self:pump(0)
+    processed = processed + 1
+    assert(processed < 1000, "the links adapter kept queueing events")
+  end
+  return processed
 end
 
 -- tick advances time: expiring idle flows, re-judging Connectivity State,
