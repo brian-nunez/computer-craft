@@ -1,0 +1,27 @@
+{
+  "algorithm": "EdDSA",
+  "audience": "craftnet-gateway",
+  "claims": {
+    "aud": "craftnet-gateway",
+    "customer_network_id": "net-farm",
+    "exp": 1788955320,
+    "iat": 1788955200,
+    "iss": "craftnet-external",
+    "jti": "jti-000017",
+    "operations": [
+      "market.quote",
+      "market.trade"
+    ],
+    "sub": "cmp-harvester",
+    "world_id": "world-overworld"
+  },
+  "expires_at": 1788955320,
+  "issued_at": 1788955200,
+  "key_id": "kid-0001",
+  "maximum_lifetime_s": 120,
+  "note": "CraftOS transports the token opaquely. The External Application validates signature, issuer, audience, expiry, revocation, operation, and exact ancestry.",
+  "private_key_seed": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+  "public_key": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+  "schema": 1,
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImtpZC0wMDAxIiwidHlwIjoiSldUIn0.eyJhdWQiOiJjcmFmdG5ldC1nYXRld2F5IiwiY3VzdG9tZXJfbmV0d29ya19pZCI6Im5ldC1mYXJtIiwiZXhwIjoxNzg4OTU1MzIwLCJpYXQiOjE3ODg5NTUyMDAsImlzcyI6ImNyYWZ0bmV0LWV4dGVybmFsIiwianRpIjoianRpLTAwMDAxNyIsIm9wZXJhdGlvbnMiOlsibWFya2V0LnF1b3RlIiwibWFya2V0LnRyYWRlIl0sInN1YiI6ImNtcC1oYXJ2ZXN0ZXIiLCJ3b3JsZF9pZCI6IndvcmxkLW92ZXJ3b3JsZCJ9.jJlb1uDF0maYRY7bpv21WROs3xKcbmFOctnfCJPHOGrmHohSuqir_lziWnQ-KZQ7KFtfz-Lj6nZ8bemP7yHiAw"
+}

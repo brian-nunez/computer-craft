@@ -1,0 +1,48 @@
+{
+  "enrollment_secret_hex": "f8fff1f000b872c04a30d510ffeaea22d819d61d3cbbc5212262f89c6cb15c3a",
+  "messages": [
+    {
+      "kind": "enroll_open",
+      "text": "{\"body\":{\"client_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\",\"requested_name\":\"harvester\",\"role\":\"computer\"},\"kind\":\"enroll_open\",\"proof\":\"5dec481c4fe530817e7d22eee4670a4ca2712200cad309f919a2fe3dbaa1d60a\",\"request_id\":\"req-enroll-1\",\"v\":1}"
+    },
+    {
+      "kind": "enroll_challenge",
+      "text": "{\"body\":{\"client_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\",\"parent_id\":\"rtr-farm\",\"parent_nonce\":\"22222222222222222222222222222222222222222222222222222222bbbbbbbb\",\"parent_revision\":4,\"relationship_id\":\"rel-farm-0007\"},\"kind\":\"enroll_challenge\",\"proof\":\"0cda6020dc2d0c38f0bbe2304338bbeb5a6ac90fc7bf1d02842086543812a7c2\",\"request_id\":\"req-enroll-1\",\"v\":1}"
+    },
+    {
+      "kind": "enroll_confirm",
+      "text": "{\"body\":{\"child_revision\":0,\"client_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\",\"parent_nonce\":\"22222222222222222222222222222222222222222222222222222222bbbbbbbb\",\"relationship_id\":\"rel-farm-0007\"},\"kind\":\"enroll_confirm\",\"proof\":\"d299eb3dcdb59a71426367e1a7d06d0a2ade4110303c3e93c012ad65db4fb271\",\"request_id\":\"req-enroll-1\",\"v\":1}"
+    },
+    {
+      "kind": "enroll_accept",
+      "text": "{\"body\":{\"child_id\":\"cmp-harvester\",\"configuration\":{\"address\":\"192.168.1.20\",\"computer_id\":\"cmp-harvester\",\"customer_network_id\":\"net-farm\",\"dns_address\":\"192.168.1.1\",\"hostname\":\"harvester\",\"router_address\":\"192.168.1.1\"},\"operational_channel\":3100,\"parent_revision\":4,\"relationship_id\":\"rel-farm-0007\"},\"kind\":\"enroll_accept\",\"proof\":\"0755d670efbe994a9cde948f4e2c1cafed8f2e8e83eb7e270463cc5f37f4b45d\",\"request_id\":\"req-enroll-1\",\"v\":1}"
+    }
+  ],
+  "note": "Verify every proof under the enrollment secret, then derive the relationship credential from the transcript. A LAN Password enrolls a Computer exactly this way.",
+  "rejected": [
+    {
+      "error": "authentication_failed",
+      "kind": "enroll_open",
+      "name": "a proof made with the wrong secret is refused",
+      "text": "{\"body\":{\"client_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\",\"requested_name\":\"harvester\",\"role\":\"computer\"},\"kind\":\"enroll_open\",\"proof\":\"c92d6f8bd708e2c2d57709b33dd4188d91363f7755c2312a9ae05345052f5ac7\",\"request_id\":\"req-enroll-1\",\"v\":1}"
+    },
+    {
+      "error": "authentication_failed",
+      "kind": "enroll_challenge",
+      "name": "a changed body invalidates the proof",
+      "text": "{\"body\":{\"client_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\",\"parent_id\":\"rtr-farm\",\"parent_nonce\":\"22222222222222222222222222222222222222222222222222222222bbbbbbbb\",\"parent_revision\":5,\"relationship_id\":\"rel-farm-0007\"},\"kind\":\"enroll_challenge\",\"proof\":\"0cda6020dc2d0c38f0bbe2304338bbeb5a6ac90fc7bf1d02842086543812a7c2\",\"request_id\":\"req-enroll-1\",\"v\":1}"
+    }
+  ],
+  "relationship_credential": "27feca0d43542a4784b26e5fa79f422dfb42519247dbcf65401828c6372d4748",
+  "request_id": "req-enroll-1",
+  "schema": 1,
+  "transcript": {
+    "client_nonce": "11111111111111111111111111111111111111111111111111111111aaaaaaaa",
+    "parent_id": "rtr-farm",
+    "parent_nonce": "22222222222222222222222222222222222222222222222222222222bbbbbbbb",
+    "parent_revision": 4,
+    "relationship_id": "rel-farm-0007",
+    "requested_name": "harvester",
+    "role": "computer"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "cases": [
+    {
+      "counter": 1,
+      "kind": "heartbeat",
+      "name": "uncorrelated notification signs an empty request id",
+      "request_id": "",
+      "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":4},\"body_hash\":\"c3ae55991ef691b0f4cfe2cc0386b0bc439b3cf1740c29e87918b318d67985fb\",\"counter\":1,\"kind\":\"heartbeat\",\"mac\":\"41e25dd19577d7c6d7098450b75df01e681dc4b0397231d064363d6fa8f848e6\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+    },
+    {
+      "counter": 1,
+      "kind": "dns_query",
+      "name": "correlated request carries its request id",
+      "request_id": "req-104",
+      "text": "{\"body\":{\"name\":\"harvester.farm.acme.craft\"},\"body_hash\":\"aa6db7cfca7d4ca8ddcadacc6484e22161a0fdda254684463b001e433608b343\",\"counter\":1,\"kind\":\"dns_query\",\"mac\":\"a7753e65b5fa15d1b0925797a928f2f94f3b0078f24270f63e0772e320f8bb3f\",\"relationship_id\":\"rel-farm-0007\",\"request_id\":\"req-104\",\"session_id\":\"ses-000042\",\"v\":1}"
+    }
+  ],
+  "note": "Open each text with a fresh session and confirm the kind, counter, and request id.",
+  "relationship_id": "rel-farm-0007",
+  "schema": 1,
+  "session_id": "ses-000042",
+  "session_key_hex": "5f4dcc3b5aa765d61d8327deb882cf995f4dcc3b5aa765d61d8327deb882cf99"
+}

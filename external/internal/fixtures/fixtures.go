@@ -23,14 +23,16 @@ type manifest struct {
 }
 
 type entry struct {
-	Path   string `json:"path"`
-	Kind   string `json:"kind"`
-	Expect string `json:"expect"`
+	Path      string   `json:"path"`
+	Kind      string   `json:"kind"`
+	Expect    string   `json:"expect"`
+	Consumers []string `json:"consumers"`
 }
 
 // Validate checks the catalog structure and ensures every JSON fixture is
-// listed exactly once. Protocol-specific fixture semantics arrive in
-// Milestone 1.
+// listed exactly once, is valid JSON, and names the implementations that must
+// replay it. The fixture semantics themselves are asserted by the protocol
+// conformance tests in each language; this validator guards the catalog.
 func Validate(root string) error {
 	contents, err := os.ReadFile(filepath.Join(root, manifestName))
 	if err != nil {
@@ -115,6 +117,19 @@ func validateEntry(fixture entry) error {
 	}
 	if fixture.Expect != "valid" && fixture.Expect != "invalid" {
 		return fmt.Errorf("expect = %q, want valid or invalid", fixture.Expect)
+	}
+	if len(fixture.Consumers) == 0 {
+		return errors.New("consumers must name at least one implementation")
+	}
+	seen := make(map[string]struct{}, len(fixture.Consumers))
+	for _, consumer := range fixture.Consumers {
+		if consumer != "lua" && consumer != "go" {
+			return fmt.Errorf("consumer %q is not a CraftNet implementation", consumer)
+		}
+		if _, duplicate := seen[consumer]; duplicate {
+			return fmt.Errorf("consumer %q is listed more than once", consumer)
+		}
+		seen[consumer] = struct{}{}
 	}
 	return nil
 }

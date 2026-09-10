@@ -5,7 +5,17 @@
     "networking": "^1.0.0"
   },
   "files": {
-    "init.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/init.lua"
+    "init.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/init.lua",
+    "bitops.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/bitops.lua",
+    "sha256.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/sha256.lua",
+    "hmac.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/hmac.lua",
+    "cj1.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/cj1.lua",
+    "limits.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/limits.lua",
+    "errors.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/errors.lua",
+    "schema.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/schema.lua",
+    "keys.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/keys.lua",
+    "frame.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/frame.lua",
+    "handshake.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/handshake.lua",
+    "link.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/link.lua"
   }
 }
-

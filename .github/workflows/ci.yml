@@ -20,15 +20,24 @@ jobs:
           go-version-file: external/go.mod
           cache-dependency-path: external/go.mod
 
-      - name: Install Lua 5.2
-        run: sudo apt-get update && sudo apt-get install --yes lua5.2
+      - name: Install Lua interpreters
+        run: sudo apt-get update && sudo apt-get install --yes lua5.2 lua5.4
 
       - name: Check formatting
         run: bash scripts/check-format.sh
 
-      - name: Run Milestone 0 gate
+      - name: Run the gate
         env:
           LUA_BIN: lua5.2
           CRAFTNET_TEST_SEED: "12648430"
         run: bash scripts/test-all.sh
+
+      # Lua 5.2 supplies bit32, which is the path CC:Tweaked takes. Newer
+      # interpreters removed it, so this second run exercises the arithmetic
+      # fallback in bitops against the same fixture catalog.
+      - name: Run the Lua suite without bit32
+        env:
+          LUA_BIN: lua5.4
+          CRAFTNET_TEST_SEED: "42"
+        run: bash scripts/test-lua.sh
 

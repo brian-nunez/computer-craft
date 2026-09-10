@@ -1,0 +1,30 @@
+{
+  "first_counter": 1,
+  "messages": [
+    {
+      "kind": "session_open",
+      "text": "{\"body\":{\"child_revision\":3,\"client_nonce\":\"33333333333333333333333333333333333333333333333333333333cccccccc\",\"relationship_id\":\"rel-farm-0007\"},\"kind\":\"session_open\",\"proof\":\"0dd5f644892498654fe1d34d2358c235ca13ea163ae4f2cbee22e0fbd728f04e\",\"request_id\":\"req-session-1\",\"v\":1}"
+    },
+    {
+      "kind": "session_challenge",
+      "text": "{\"body\":{\"client_nonce\":\"33333333333333333333333333333333333333333333333333333333cccccccc\",\"parent_nonce\":\"44444444444444444444444444444444444444444444444444444444dddddddd\",\"parent_revision\":4,\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\"},\"kind\":\"session_challenge\",\"proof\":\"b89559d415a0fa272c19adb3988664c59625803f27fb9b1b2cb24b4fd7282b9f\",\"request_id\":\"req-session-1\",\"v\":1}"
+    },
+    {
+      "kind": "session_confirm",
+      "text": "{\"body\":{\"client_nonce\":\"33333333333333333333333333333333333333333333333333333333cccccccc\",\"parent_nonce\":\"44444444444444444444444444444444444444444444444444444444dddddddd\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\"},\"kind\":\"session_confirm\",\"proof\":\"a12c950a46442bcfc3f6b5964c0d13f2892d93647bf57e66f1c021d6276bd226\",\"request_id\":\"req-session-1\",\"v\":1}"
+    }
+  ],
+  "note": "Proofs use the durable relationship credential. Reconnection derives a new session key rather than resuming old traffic, and the first counter is 1.",
+  "relationship_credential_hex": "27feca0d43542a4784b26e5fa79f422dfb42519247dbcf65401828c6372d4748",
+  "request_id": "req-session-1",
+  "schema": 1,
+  "session_key": "ee060f4cc8a67557ed75223e874b34c91e3fd2fc5e385d6b78a9102a684e7b4a",
+  "transcript": {
+    "child_revision": 3,
+    "client_nonce": "33333333333333333333333333333333333333333333333333333333cccccccc",
+    "parent_nonce": "44444444444444444444444444444444444444444444444444444444dddddddd",
+    "parent_revision": 4,
+    "relationship_id": "rel-farm-0007",
+    "session_id": "ses-000042"
+  }
+}

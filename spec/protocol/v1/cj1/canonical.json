@@ -1,0 +1,86 @@
+{
+  "cases": [
+    {
+      "canonical": "{}",
+      "name": "empty object",
+      "text": "{}"
+    },
+    {
+      "canonical": "[]",
+      "name": "empty array",
+      "text": "[]"
+    },
+    {
+      "canonical": "{\"A\":2,\"_\":4,\"a\":3,\"b\":1}",
+      "name": "keys sort by unsigned byte order",
+      "text": "{\"b\":1,\"A\":2,\"a\":3,\"_\":4}"
+    },
+    {
+      "canonical": "{\"a\":{\"x\":null,\"y\":true},\"z\":[3,1,2]}",
+      "name": "nested containers keep array order",
+      "text": "{\"z\":[3,1,2],\"a\":{\"y\":true,\"x\":null}}"
+    },
+    {
+      "canonical": "{\"a\":[1,2]}",
+      "name": "insignificant whitespace is dropped",
+      "text": "  {\u000a  \"a\" : [ 1 , 2 ]\u000a}  "
+    },
+    {
+      "canonical": "{\"n\":-42,\"p\":9007199254740991,\"z\":0}",
+      "name": "negative zero and the exact maximum",
+      "text": "{\"n\":-42,\"z\":-0,\"p\":9007199254740991}"
+    },
+    {
+      "canonical": "{\"n\":-9007199254740991}",
+      "name": "the exact minimum",
+      "text": "{\"n\":-9007199254740991}"
+    },
+    {
+      "canonical": "{\"s\":\"a\\u000ab\\u0009c\\u0000d\"}",
+      "name": "control characters escape lowercase",
+      "text": "{\"s\":\"a\\nb\\tc\\u0000d\"}"
+    },
+    {
+      "canonical": "{\"s\":\"say \\\"hi\\\" \\\\ bye\"}",
+      "name": "quote and backslash escape",
+      "text": "{\"s\":\"say \\\"hi\\\" \\\\ bye\"}"
+    },
+    {
+      "canonical": "{\"s\":\"a/b\"}",
+      "name": "solidus is emitted unescaped",
+      "text": "{\"s\":\"a\\/b\"}"
+    },
+    {
+      "canonical": "{\"s\":\"café 日本\"}",
+      "name": "multibyte utf8 survives",
+      "text": "{\"s\":\"café 日本\"}"
+    },
+    {
+      "canonical": "{\"s\":\"😀\"}",
+      "name": "surrogate pair becomes one scalar",
+      "text": "{\"s\":\"😀\"}"
+    },
+    {
+      "canonical": "{\"a\":2,\"b\":1}",
+      "name": "escaped ascii key normalizes and re-sorts",
+      "text": "{\"b\":1,\"a\":2}"
+    },
+    {
+      "canonical": "[true,false,null]",
+      "name": "booleans and null",
+      "text": "[true,false,null]"
+    },
+    {
+      "canonical": "[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]",
+      "name": "nesting exactly at the depth limit",
+      "text": "[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]"
+    },
+    {
+      "canonical": "{\"a\":[],\"b\":false,\"i\":0,\"n\":null,\"o\":{},\"s\":\"\"}",
+      "name": "an object holding every scalar type",
+      "text": "{\"i\":0,\"s\":\"\",\"b\":false,\"n\":null,\"a\":[],\"o\":{}}"
+    }
+  ],
+  "note": "Decode text, re-encode it, and compare against canonical byte for byte.",
+  "schema": 1
+}

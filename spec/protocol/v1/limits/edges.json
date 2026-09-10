@@ -1,0 +1,95 @@
+{
+  "cases": [
+    {
+      "expect": "accepted",
+      "filler": "a",
+      "length": 8192,
+      "name": "a string exactly at the limit is accepted",
+      "recipe": "string"
+    },
+    {
+      "expect": "message_too_large",
+      "filler": "a",
+      "length": 8193,
+      "name": "a string one byte past the limit is refused",
+      "recipe": "string"
+    },
+    {
+      "count": 128,
+      "expect": "accepted",
+      "name": "an object with exactly the maximum keys is accepted",
+      "recipe": "object_keys"
+    },
+    {
+      "count": 129,
+      "expect": "message_too_large",
+      "name": "an object one key past the maximum is refused",
+      "recipe": "object_keys"
+    },
+    {
+      "count": 2000,
+      "expect": "accepted",
+      "name": "an array with exactly the maximum elements is accepted",
+      "recipe": "array_elements"
+    },
+    {
+      "count": 2001,
+      "expect": "message_too_large",
+      "name": "an array one element past the maximum is refused",
+      "recipe": "array_elements"
+    },
+    {
+      "count": 16,
+      "expect": "accepted",
+      "name": "nesting exactly at the depth limit is accepted",
+      "recipe": "depth"
+    },
+    {
+      "count": 17,
+      "expect": "message_too_large",
+      "name": "nesting one level past the limit is refused",
+      "recipe": "depth"
+    },
+    {
+      "chunks": [
+        4096,
+        4096,
+        4096,
+        4075
+      ],
+      "expect": "accepted",
+      "length": 16384,
+      "name": "a modem frame exactly at the limit is accepted",
+      "recipe": "modem_frame"
+    },
+    {
+      "chunks": [
+        4096,
+        4096,
+        4096,
+        4076
+      ],
+      "expect": "message_too_large",
+      "length": 16385,
+      "name": "a modem frame one byte past the limit is refused",
+      "recipe": "modem_frame"
+    }
+  ],
+  "limits": {
+    "access_token_seconds": 120,
+    "array_elements": 2000,
+    "depth": 16,
+    "gateway_frame_bytes": 262144,
+    "gateway_in_flight": 256,
+    "modem_frame_bytes": 16384,
+    "modem_payload_bytes": 8192,
+    "object_keys": 128,
+    "relationship_in_flight": 64,
+    "string_bytes": 8192,
+    "topology_entities": 2000,
+    "traffic_batch_bytes": 131072,
+    "traffic_batch_events": 100
+  },
+  "note": "Build each input from its recipe, then decode it. CraftNet performs no fragmentation: an oversized caller is told to shrink its own payload.",
+  "schema": 1
+}

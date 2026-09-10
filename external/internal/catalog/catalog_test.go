@@ -1,6 +1,11 @@
 package catalog
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 func TestSafeVersion(t *testing.T) {
 	for _, valid := range []string{"0.1.0", "1.0.0", "12.34.56"} {
@@ -25,5 +30,37 @@ func TestSafeRelative(t *testing.T) {
 		if safeRelative(invalid) {
 			t.Errorf("safeRelative(%q) = true, want false", invalid)
 		}
+	}
+}
+
+// A module that ships in the repository but is missing from its manifest would
+// never reach a Computer, failing at load time rather than at install time.
+func TestValidateRejectsAnUnlistedPackageSource(t *testing.T) {
+	root := t.TempDir()
+	write := func(name, contents string) {
+		t.Helper()
+		filePath := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+		if err := os.WriteFile(filePath, []byte(contents), 0o600); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+	}
+
+	write("registry.json", `{"schema":1,"packages":{"demo":{"versions":{"0.1.0":{"manifest":"`+
+		rawPrefix+`packages/demo/0.1.0.json"}}}}}`)
+	write("packages/demo/0.1.0.json", `{"name":"demo","version":"0.1.0","dependencies":{},"files":{"init.lua":"`+
+		rawPrefix+`packages/demo/files/init.lua"}}`)
+	write("packages/demo/files/init.lua", "return {}\n")
+
+	if err := Validate(root); err != nil {
+		t.Fatalf("Validate() error = %v, want success", err)
+	}
+
+	write("packages/demo/files/helper.lua", "return {}\n")
+	err := Validate(root)
+	if err == nil || !strings.Contains(err.Error(), "not listed in any manifest") {
+		t.Fatalf("Validate() error = %v, want unlisted source failure", err)
 	}
 }
