@@ -38,6 +38,9 @@ type Options struct {
 	SigningSeed []byte
 	Retention   time.Duration
 	Logf        func(string, ...any)
+	// SecureCookies marks the dashboard session cookie HTTPS-only. It is off
+	// for a loopback development run and on behind TLS.
+	SecureCookies bool
 }
 
 // New assembles everything and registers the operations this release allows.
@@ -77,7 +80,9 @@ func New(options Options) (*App, error) {
 		Gateways: gateways, View: view,
 	}
 	application.Web = web.New(web.Options{
-		Gateways: gateways, View: view, Store: options.Store, Now: now, Logf: options.Logf,
+		Gateways: gateways, View: view, Identities: identities,
+		Store: options.Store, Now: now, Logf: options.Logf,
+		SecureCookies: options.SecureCookies,
 	})
 
 	if err := application.registerOperations(now); err != nil {

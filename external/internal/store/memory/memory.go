@@ -26,6 +26,8 @@ type data struct {
 	events      map[string][]store.Event
 	commands    map[string]store.Command
 	audit       map[string][]store.AuditRecord
+	operators   map[string]store.Operator
+	sessions    map[string]store.Session
 }
 
 func newData() *data {
@@ -38,6 +40,8 @@ func newData() *data {
 		events:      map[string][]store.Event{},
 		commands:    map[string]store.Command{},
 		audit:       map[string][]store.AuditRecord{},
+		operators:   map[string]store.Operator{},
+		sessions:    map[string]store.Session{},
 	}
 }
 
@@ -68,6 +72,12 @@ func (d *data) clone() *data {
 	}
 	for key, value := range d.audit {
 		copied.audit[key] = append([]store.AuditRecord(nil), value...)
+	}
+	for key, value := range d.operators {
+		copied.operators[key] = value
+	}
+	for key, value := range d.sessions {
+		copied.sessions[key] = value
 	}
 	return copied
 }
@@ -334,4 +344,59 @@ func (t *tx) Audit(worldID string, limit int) ([]store.AuditRecord, error) {
 		held = held[len(held)-limit:]
 	}
 	return append([]store.AuditRecord(nil), held...), nil
+}
+
+//--------------------------------------------------------------------------
+// Operators and sessions
+//--------------------------------------------------------------------------
+
+func (t *tx) PutOperator(operator store.Operator) error {
+	t.data.operators[operator.Name] = operator
+	return nil
+}
+
+func (t *tx) Operator(name string) (store.Operator, error) {
+	operator, ok := t.data.operators[name]
+	if !ok {
+		return store.Operator{}, store.ErrNotFound
+	}
+	return operator, nil
+}
+
+func (t *tx) Operators() ([]store.Operator, error) {
+	found := make([]store.Operator, 0, len(t.data.operators))
+	for _, operator := range t.data.operators {
+		found = append(found, operator)
+	}
+	sort.Slice(found, func(a, b int) bool { return found[a].Name < found[b].Name })
+	return found, nil
+}
+
+func (t *tx) PutSession(session store.Session) error {
+	t.data.sessions[session.TokenSHA] = session
+	return nil
+}
+
+func (t *tx) Session(tokenSHA string) (store.Session, error) {
+	session, ok := t.data.sessions[tokenSHA]
+	if !ok {
+		return store.Session{}, store.ErrNotFound
+	}
+	return session, nil
+}
+
+func (t *tx) DeleteSession(tokenSHA string) error {
+	delete(t.data.sessions, tokenSHA)
+	return nil
+}
+
+func (t *tx) PruneSessions(before time.Time) (int64, error) {
+	var removed int64
+	for token, session := range t.data.sessions {
+		if session.ExpiresAt.Before(before) {
+			delete(t.data.sessions, token)
+			removed++
+		}
+	}
+	return removed, nil
 }

@@ -49,6 +49,7 @@ function handlers.configure(engine, input, now, out)
   state.isps = state.isps or {}
   state.routes = state.routes or {}
   state.network_status = state.network_status or {}
+  state.computers = state.computers or {}
 
   out:durable("configured", { world_id = state.world_id })
   out:ok({ world_id = state.world_id, central_id = state.central_id })
@@ -401,6 +402,45 @@ function messages.ack(engine, link, message, now, out)
   out:ok({ acknowledged = get(message.body, "acked_request_id") })
 end
 
+-- topology_change is how the Central Server learns a World's Computers without
+-- ever having met one. It is a projection, so it is applied only for a Customer
+-- Network the reporting ISP actually owns.
+function messages.topology_change(engine, link, message, now, out)
+  local state = engine.state
+  if link.role ~= "isp" or not state.isps[link.id] then
+    return out:fail("forbidden_operation", "only a registered ISP may report here")
+  end
+
+  local entity = get(message.body, "entity")
+  local networkId = get(entity, "customer_network_id")
+  local route = state.routes[networkId]
+  if not route or route.isp_id ~= link.id then
+    return out:fail("forbidden_operation",
+      "an ISP may only report for its own Customer Networks")
+  end
+  if get(message.body, "entity_type") ~= "computer" then
+    return out:ok({ ignored = get(message.body, "entity_type") })
+  end
+
+  state.computers = state.computers or {}
+  local computerId = get(entity, "computer_id")
+  if get(message.body, "change") == "removed" then
+    state.computers[computerId] = nil
+    out:durable("computer_forgotten", { computer_id = computerId })
+  else
+    state.computers[computerId] = {
+      computer_id = computerId,
+      hostname = get(entity, "hostname"),
+      address = get(entity, "address"),
+      customer_network_id = networkId,
+      router_id = route.router_id,
+      isp_id = route.isp_id,
+    }
+    out:durable("computer_recorded", { computer_id = computerId })
+  end
+  out:ok({ computer_id = computerId })
+end
+
 -- dns_query reaches the Central Server only when the name names another ISP.
 function messages.dns_query(engine, link, message, now, out)
   local state = engine.state
@@ -488,6 +528,76 @@ function handlers.external_request(engine, input, now, out)
   out:ok({ operation = input.operation, forwarded = true })
 end
 
+-- reject answers an administrative command the Central Server will not carry
+-- out. The answer always goes back, applied or rejected: a command with no
+-- answer is one the External Application resends forever under the same Command
+-- ID, so refusing one out loud is part of the contract rather than an
+-- afterthought.
+local function reject(engine, out, commandId, requestId, code, message)
+  out:gateway("command_result", protocol.object({
+    command_id = commandId,
+    status = "rejected",
+    revision = engine.state.revision or 0,
+    error = protocol.errors.new(code, message),
+  }), { request_id = requestId, command_id = commandId })
+  return out:fail(code, message)
+end
+
+-- gateway_frame is what arrived on the Gateway Session. The only thing v1
+-- accepts inward is an administrative command, and the only administrative
+-- command is set_network_status: the External Application observes a World and
+-- may disable a Customer Network, and that is the whole of its authority.
+--
+-- Everything an Operator asked for is applied here, by the Central Server, on
+-- its own authoritative state. The External Application never edits a World; it
+-- asks, and this is where the asking is answered.
+function handlers.gateway_frame(engine, input, now, out)
+  if input.frame_kind ~= "admin_command" then
+    return out:fail("forbidden_operation",
+      "the Gateway carries only administrative commands inward")
+  end
+
+  local body = input.body or protocol.object()
+  local commandId = input.command_id or get(body, "command_id")
+  if type(commandId) ~= "string" or not protocol.validate.identifier(commandId) then
+    return out:fail("invalid_message", "an administrative command needs a Command ID")
+  end
+  local requestId = input.request_id or commandId
+
+  if get(body, "action") ~= "set_network_status" then
+    return reject(engine, out, commandId, requestId, "forbidden_operation",
+      "set_network_status is the only administrative command in v1")
+  end
+
+  -- The ordinary handler does the work, so a command that arrives over the
+  -- Gateway and one an Operator types at the Central Server take exactly the
+  -- same path, including its idempotency by Command ID.
+  handlers.set_network_status(engine, {
+    customer_network_id = get(body, "customer_network_id"),
+    status = get(body, "status"),
+    command_id = commandId,
+  }, now, out)
+
+  local applied = out.result
+  if not applied.ok then
+    return reject(engine, out, commandId, requestId, applied.code, applied.message)
+  end
+
+  -- A repeat answers with the revision the change was applied at, not with a
+  -- fresh one: nothing happened this time round.
+  out:gateway("command_result", protocol.object({
+    command_id = commandId,
+    status = "applied",
+    revision = applied.revision or (engine.state.revision or 0) + 1,
+  }), { request_id = requestId, command_id = commandId })
+  out:ok({
+    command_id = commandId,
+    customer_network_id = applied.customer_network_id,
+    status = applied.status,
+    repeated = applied.repeated or false,
+  })
+end
+
 --------------------------------------------------------------------------
 -- Topology
 --------------------------------------------------------------------------
@@ -515,6 +625,22 @@ function handlers.topology(engine, input, now, out)
     }))
   end
 
+  local computers = protocol.array()
+  local computerIds = {}
+  for computerId in pairs(state.computers or {}) do computerIds[#computerIds + 1] = computerId end
+  table.sort(computerIds)
+  for _, computerId in ipairs(computerIds) do
+    local computer = state.computers[computerId]
+    rawset(computers, #computers + 1, protocol.object({
+      computer_id = computer.computer_id,
+      hostname = computer.hostname,
+      address = computer.address,
+      customer_network_id = computer.customer_network_id,
+      router_id = computer.router_id,
+      isp_id = computer.isp_id,
+    }))
+  end
+
   local networkIds = {}
   for networkId in pairs(state.routes) do networkIds[#networkIds + 1] = networkId end
   table.sort(networkIds)
@@ -539,7 +665,7 @@ function handlers.topology(engine, input, now, out)
       world = protocol.object({ world_id = state.world_id, central_id = state.central_id }),
       isps = isps,
       routers = routers,
-      computers = protocol.array(),
+      computers = computers,
       network_statuses = statuses,
     }),
   })

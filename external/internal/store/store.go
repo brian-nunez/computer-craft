@@ -161,6 +161,30 @@ type AuditRecord struct {
 	Recorded time.Time
 }
 
+// Operator is someone who can sign in to the dashboard. The password is stored
+// as a salted, iterated digest -- never the password, and never something a
+// leaked database could be replayed with.
+type Operator struct {
+	Name        string
+	Salt        string
+	PasswordSHA string
+	Iterations  int
+	CreatedAt   time.Time
+	DisabledAt  *time.Time
+}
+
+// Disabled reports whether this operator may still sign in.
+func (o Operator) Disabled() bool { return o.DisabledAt != nil }
+
+// Session is one signed-in browser. Only the token's digest is kept, so a
+// leaked database yields no live session.
+type Session struct {
+	TokenSHA  string
+	Operator  string
+	IssuedAt  time.Time
+	ExpiresAt time.Time
+}
+
 // Tx is everything one transaction can do. Nothing here writes outside a
 // transaction, so a half-applied change is not representable.
 type Tx interface {
@@ -191,6 +215,15 @@ type Tx interface {
 	PutCommand(Command) error
 	Command(commandID string) (Command, error)
 	PendingCommands(worldID string) ([]Command, error)
+
+	PutOperator(Operator) error
+	Operator(name string) (Operator, error)
+	Operators() ([]Operator, error)
+
+	PutSession(Session) error
+	Session(tokenSHA string) (Session, error)
+	DeleteSession(tokenSHA string) error
+	PruneSessions(before time.Time) (int64, error)
 
 	AppendAudit(AuditRecord) error
 	Audit(worldID string, limit int) ([]AuditRecord, error)

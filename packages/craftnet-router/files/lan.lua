@@ -22,11 +22,14 @@ lan.DISCOVERY_CHANNEL = 42002
 
 function lan.newListener(options)
   assert(type(options) == "table", "a LAN listener needs options")
-  for _, field in ipairs({ "transport", "clock", "engine", "password", "router_id" }) do
+  for _, field in ipairs({ "transport", "clock", "engine", "submit", "password", "router_id" }) do
     assert(options[field] ~= nil, "a LAN listener needs '" .. field .. "'")
   end
   local engine = options.engine
   local clock = options.clock
+  -- Transitions go through the runtime rather than straight at the engine, so
+  -- that what they ask for -- a snapshot, a report upward -- actually happens.
+  local submit = options.submit
   local listener
 
   listener = runtimePackage.enroll.newListener({
@@ -49,20 +52,20 @@ function lan.newListener(options)
     -- A password can be guessed at online, so an attempt costs something before
     -- it is even considered.
     admit = function(claimed)
-      local outcome = engine:handle({
+      local outcome = submit({
         kind = "lan_admission",
         client_id = claimed.client_id,
         requested_name = claimed.requested_name,
-      }, clock:now())
+      })
       if outcome.result.ok then return true end
       return false, "rate_limited"
     end,
     refused = function(claimed)
-      engine:handle({
+      submit({
         kind = "lan_failure",
         client_id = claimed.client_id,
         requested_name = claimed.requested_name,
-      }, clock:now())
+      })
     end,
 
     -- What a Customer Router assigns is an address out of its own pool, and an
@@ -71,11 +74,11 @@ function lan.newListener(options)
     assign = function(request)
       local computerId = request.client_id
         or (engine.state.customer_network_id .. "-" .. request.requested_name)
-      local outcome = engine:handle({
+      local outcome = submit({
         kind = "bind_computer",
         computer_id = computerId,
         hostname = request.requested_name,
-      }, clock:now())
+      })
       if not outcome.result.ok then
         return nil, outcome.result.code, outcome.result.message
       end
@@ -96,11 +99,11 @@ function lan.newListener(options)
 
     on_joined = function(joined)
       -- One mistyped password must not follow a Computer around.
-      engine:handle({
+      submit({
         kind = "lan_success",
         client_id = joined.claimed and joined.claimed.client_id,
         requested_name = joined.claimed and joined.claimed.requested_name,
-      }, clock:now())
+      })
       if options.on_joined then options.on_joined(joined) end
     end,
 

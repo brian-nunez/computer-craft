@@ -32,7 +32,8 @@ ccpm install craftnet-computer    # Computers 5 through 8
 Generate the World's root secrets outside Minecraft:
 
 ```bash
-cd external && go run ./cmd/craftnetprov -out ../data/world.json
+cd external && go run ./cmd/craftnetd provision \
+  -world world-overworld -central central-main
 ```
 
 ## Checks

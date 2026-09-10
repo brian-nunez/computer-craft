@@ -314,6 +314,75 @@ test("scenario 1: a spent token cannot be used again", function()
   assertTrue(world.central:state().isps["isp-bolt"] == nil, "nothing was registered")
 end)
 
+test("scenario 9: every device in the World reaches the Central Server's view", function()
+  local world = fullWorld()
+  local topology = world.central:topology()
+
+  local computers = get(topology, "computers")
+  assertEqual(#computers, 4, "all four Computers appear")
+
+  local byId = {}
+  for _, entry in ipairs(computers) do byId[get(entry, "computer_id")] = entry end
+
+  local alex = byId[world.bindings["alex-pc"].computer_id]
+  assertTrue(alex ~= nil, "alex-pc is in the view")
+  assertEqual(get(alex, "hostname"), "alex-pc", "with its hostname")
+  assertEqual(get(alex, "address"), "192.168.1.20", "and its address")
+  assertEqual(get(alex, "customer_network_id"), "network-home", "in its own network")
+  assertEqual(get(alex, "isp_id"), "isp-acme", "under its ISP")
+
+  -- The Computer holding the same address in the other network is distinct.
+  local harvester = byId[world.bindings["harvester"].computer_id]
+  assertEqual(get(harvester, "address"), "192.168.1.20", "the overlapping address")
+  assertEqual(get(harvester, "customer_network_id"), "network-farm", "in the other network")
+
+  -- Nothing secret travelled with it.
+  local rendered = assert(protocol.conformance.cj1.encode(topology))
+  for _, forbidden in ipairs({ "credential", "password", "token", "secret", "mac", "proof", "payload" }) do
+    assertTrue(rendered:lower():find(forbidden, 1, true) == nil,
+      "'" .. forbidden .. "' reached the topology projection")
+  end
+end)
+
+test("scenario 9: a released Computer leaves the World's view", function()
+  local world = fullWorld()
+  local computerId = world.bindings["silo-monitor"].computer_id
+
+  world:pump(function()
+    world.nodes["router-farm"].runtime:submit({
+      kind = "release_binding", computer_id = computerId,
+    })
+    world.nodes["router-farm"]:serve(200)
+  end)
+
+  local computers = get(world.central:topology(), "computers")
+  for _, entry in ipairs(computers) do
+    assertTrue(get(entry, "computer_id") ~= computerId,
+      "a released Computer is still in the view")
+  end
+  assertEqual(#computers, 3, "the other three remain")
+end)
+
+test("an ISP cannot report a Computer for a network it does not serve", function()
+  local world = fullWorld()
+  local outcome = world.central.runtime:submit({
+    kind = "message",
+    relationship_id = world.isp:state().relationship_id,
+    message = {
+      kind = "topology_change", request_id = "forged-1",
+      body = protocol.object({
+        revision = 1, change = "added", entity_type = "computer",
+        entity = protocol.object({
+          computer_id = "computer-elsewhere", hostname = "elsewhere",
+          address = "192.168.1.50", customer_network_id = "network-nowhere",
+        }),
+      }),
+    },
+  })
+  assertTrue(not outcome.result.ok, "the report was refused")
+  assertEqual(outcome.result.code, "forbidden_operation", "code")
+end)
+
 test("scenario 1: the hierarchy matches the reference topology", function()
   local world = fullWorld()
   local topology = world.central:topology()

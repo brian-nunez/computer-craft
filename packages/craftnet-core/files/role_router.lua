@@ -24,6 +24,7 @@ local handlers = {
 }
 
 local get = rawget
+local reportComputer
 
 local function pool(state)
   return { first = ipv4.toNumber(state.pool_first), last = ipv4.toNumber(state.pool_last) }
@@ -161,6 +162,11 @@ function handlers.bind_computer(engine, input, now, out)
   out:durable("binding_created", {
     computer_id = input.computer_id, hostname = hostname, address = address,
   })
+  -- The Central Server aggregates a World's Computers for the dashboard, and
+  -- this router is the only role that knows one exists. What travels upward is
+  -- the summary an Operator needs to find it -- never a credential, and never
+  -- anything about what it has been saying.
+  reportComputer(engine, out, "added", state.bindings[input.computer_id])
   out:ok({ computer_id = input.computer_id, hostname = hostname, address = address, reused = false })
 end
 
@@ -175,6 +181,7 @@ function handlers.release_binding(engine, input, now, out)
   state.bindings[input.computer_id] = nil
   state.exposed[input.computer_id] = nil
   out:durable("binding_released", { computer_id = input.computer_id, address = binding.address })
+  reportComputer(engine, out, "removed", binding)
   out:ok({ computer_id = input.computer_id, address = binding.address })
 end
 
@@ -195,6 +202,25 @@ function handlers.expose_service(engine, input, now, out)
     exposed = state.exposed[input.computer_id][input.service],
   })
   out:ok({ computer_id = input.computer_id, service = input.service })
+end
+
+-- reportComputer tells this router's ISP that a Computer arrived or left, so
+-- the Central Server can hold a World-wide view without ever having met one.
+function reportComputer(engine, out, change, binding)
+  if not engine.parentRelationshipId then return end
+  local state = engine.state
+  out:send(engine.parentRelationshipId, "topology_change", protocol.object({
+    revision = (state.revision or 0) + 1,
+    change = change,
+    entity_type = "computer",
+    entity = protocol.object({
+      computer_id = binding.computer_id,
+      hostname = binding.hostname,
+      address = binding.address,
+      customer_network_id = state.customer_network_id,
+      router_id = state.router_id,
+    }),
+  }), engine:allocateRequestId())
 end
 
 --------------------------------------------------------------------------

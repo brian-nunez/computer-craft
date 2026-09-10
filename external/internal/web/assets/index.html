@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CraftNet</title>
+<link rel="stylesheet" href="/assets/dashboard.css">
+</head>
+<body>
+
+<!--
+  The dashboard is one page served from one origin, with no framework and no
+  external asset: everything here ships inside craftnetd. Which means it also
+  works on a laptop with no internet, next to a Minecraft server that has none.
+
+  Three views share one selection. The topology canvas is primary; Traffic and
+  Incidents answer "what did this node do" and "what went wrong" about whatever
+  is selected there, so an Operator never has to find the same node twice.
+-->
+
+<div id="signin" class="signin" hidden>
+  <form class="card" id="signin-form">
+    <h1>CraftNet</h1>
+    <label>Operator <input name="name" autocomplete="username" required></label>
+    <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+    <button type="submit">Sign in</button>
+    <p class="problem" id="signin-problem" hidden></p>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <h1>CraftNet</h1>
+    <div class="worlds"><select id="world"></select></div>
+    <div class="presence" id="presence"></div>
+    <div class="who"><span id="operator"></span> <button id="signout">Sign out</button></div>
+  </header>
+
+  <nav class="tabs">
+    <button data-view="topology" class="active">Topology</button>
+    <button data-view="traffic">Traffic</button>
+    <button data-view="incidents">Incidents</button>
+    <button data-view="audit">Audit</button>
+  </nav>
+
+  <div class="stale" id="stale" hidden>
+    This World has no live Gateway Session. Everything below is the last thing it
+    reported, not what is happening now.
+  </div>
+
+  <main>
+    <!-- Topology: the World as a navigable hierarchy, with Provider Addresses
+         and network-scoped RFC 1918 addresses visible together. -->
+    <section id="view-topology" class="view">
+      <div class="canvas" id="canvas"></div>
+      <aside class="inspector" id="inspector">
+        <p class="hint">Select a node to inspect it.</p>
+      </aside>
+    </section>
+
+    <!-- Traffic: the dense event table and its summary counters. -->
+    <section id="view-traffic" class="view" hidden>
+      <div class="filters" id="traffic-filters">
+        <label>Outcome <select id="filter-outcome"><option value="">any</option></select></label>
+        <label>Operation <select id="filter-operation"><option value="">any</option></select></label>
+        <label>Direction <select id="filter-direction">
+          <option value="">any</option><option>inbound</option>
+          <option>outbound</option><option>local</option>
+        </select></label>
+        <label class="scope"><input type="checkbox" id="filter-selected" checked> Only the selected node</label>
+        <button id="filter-clear">Clear</button>
+      </div>
+      <div class="counters" id="counters"></div>
+      <div class="table-wrap"><table id="traffic"><thead><tr>
+        <th>Seq</th><th>Observed</th><th>Direction</th><th>Kind</th>
+        <th>Operation</th><th>Outcome</th><th>Bytes</th><th>Where</th>
+      </tr></thead><tbody></tbody></table></div>
+    </section>
+
+    <!-- Incidents: the exception queue, so failures stay actionable without
+         routine traffic drowning them. -->
+    <section id="view-incidents" class="view" hidden>
+      <div class="queue" id="queue"></div>
+      <div class="timeline" id="timeline"></div>
+    </section>
+
+    <section id="view-audit" class="view" hidden>
+      <div class="table-wrap"><table id="audit"><thead><tr>
+        <th>Recorded</th><th>Actor</th><th>Action</th><th>Subject</th><th>Detail</th>
+      </tr></thead><tbody></tbody></table></div>
+    </section>
+  </main>
+</div>
+
+<dialog id="confirm">
+  <form method="dialog" class="card">
+    <h2 id="confirm-title">Confirm</h2>
+    <p id="confirm-body"></p>
+    <menu>
+      <button value="cancel">Cancel</button>
+      <button value="ok" class="danger" id="confirm-ok">Confirm</button>
+    </menu>
+  </form>
+</dialog>
+
+<script src="/assets/dashboard.js"></script>
+</body>
+</html>

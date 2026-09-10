@@ -5,12 +5,13 @@ model one Central Server, multiple ISPs, Customer Routers, and Computers, while
 the Go External Application provides the controlled WebSocket gateway and
 operator dashboard.
 
-Implementation Milestone 6 is complete: `craftnetd` is a real application. It
-provisions Worlds, serves one Gateway Session per World over a WebSocket, issues
-Device Credentials and two-minute Access Tokens, and stores everything in SQLite.
-The Operator dashboard intentionally begins in Milestone 7, and the in-world
-acceptance runs for Milestones 4 and 5 have still not been performed — see
-[the checklists](docs/implementation/acceptance/). The complete design and
+Implementation Milestone 7 is complete: a World is now something an Operator can
+look at. `craftnetd` serves an embedded dashboard on the same origin as its
+Gateway, with cookie sign-in, a topology canvas, linked traffic and incident
+views, and confirmed Enable/Disable of a Customer Network that travels all the
+way to authoritative in-world state. The in-world Gateway transport is still
+deferred, and the acceptance runs for Milestones 4, 5, and 7 have not been
+performed — see [the checklists](docs/implementation/acceptance/). The complete design and
 delivery gates are indexed in
 [the CraftNet v1 map](.scratch/craftnet-v1/map.md), and completed-gate evidence
 is recorded under [`docs/implementation/`](docs/implementation/).
@@ -31,7 +32,7 @@ local feedback.
 
 ## Development commands
 
-Run the complete Milestone 6 gate from the repository root:
+Run the complete Milestone 7 gate from the repository root:
 
 ```bash
 make test
@@ -190,12 +191,13 @@ it reachable from another one.
 ## The External Application
 
 [`external/`](external/) is one Go binary: `craftnetd`. It serves the Central
-Server's Gateway, the operator interface, and (from Milestone 7) the embedded
-dashboard, on one origin and out of one SQLite file.
+Server's Gateway, the embedded Operator dashboard, and the dashboard API, on one
+origin and out of one SQLite file.
 
 ```bash
 cd external
 go run ./cmd/craftnetd provision -world world-overworld -central central-main
+go run ./cmd/craftnetd operator -name alex          # reads the password from stdin
 go run ./cmd/craftnetd serve -listen 127.0.0.1:8080
 ```
 
@@ -211,6 +213,40 @@ proxy to an arbitrary URL. This release allows `device.register`, `token.issue`,
 `echo`, `time.now`, and `test.identity`.
 
 `data/` is excluded by `.gitignore`.
+
+## The dashboard
+
+Open the address `craftnetd serve` prints. The page, its assets, and its API are
+all on that one origin, so the session is an `HttpOnly`, `SameSite=Strict`
+cookie rather than a token in local storage — and there is nothing to fetch from
+a CDN, so it works next to a Minecraft server with no internet.
+
+Three views share one selection. **Topology** is primary: the World as a
+hierarchy, with each ISP's Provider Allocation, each Customer Network's Provider
+Address and Network Status, and each Computer's network-scoped address — so the
+two Computers that both hold `192.168.1.20` are visibly in different Customer
+Networks. **Traffic** is the dense event table with filters and counters, and
+**Incidents** is the exception queue and its timeline. Selecting a node in
+Topology and pressing "See its traffic" carries that selection across.
+
+A credential's *status* is shown; a credential's *value* never is. Neither is a
+payload, a token, or a MAC — a Traffic Event was never allowed to carry one.
+
+Disabling a Customer Network asks for confirmation, records the decision against
+the Operator who made it, and sends one idempotent Command to the Central
+Server. Disabling refuses that network's new operations and keeps every durable
+registration, so re-enabling it needs no re-enrollment and changes no address.
+
+```bash
+go run ./cmd/craftnetd operator -name alex        # create or re-password
+go run ./cmd/craftnetd operator -list
+go run ./cmd/craftnetd operator -name alex -disable
+go run ./cmd/craftnetd serve -secure-cookies      # behind TLS
+```
+
+A World nobody is connected to is marked stale rather than shown as current:
+what the dashboard displays is the last thing a Central Server reported, and it
+says so.
 
 ## Repository layout
 

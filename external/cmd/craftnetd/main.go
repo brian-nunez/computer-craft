@@ -1,11 +1,11 @@
 // Command craftnetd is the CraftNet External Application.
 //
-// One process serves the Central Server's Gateway, the operator HTTP interface,
-// and (from Milestone 7) the embedded dashboard, on one origin and out of one
-// SQLite file.
+// One process serves the Central Server's Gateway, the embedded Operator
+// dashboard, and the dashboard API, on one origin and out of one SQLite file.
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -15,11 +15,14 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/brian-nunez/computer-craft/external/internal/app"
 	"github.com/brian-nunez/computer-craft/external/internal/buildinfo"
+	"github.com/brian-nunez/computer-craft/external/internal/identity"
+	"github.com/brian-nunez/computer-craft/external/internal/store"
 	"github.com/brian-nunez/computer-craft/external/internal/store/sqlite"
 )
 
@@ -30,6 +33,8 @@ func main() {
 			os.Exit(serve(os.Args[2:]))
 		case "provision":
 			os.Exit(provision(os.Args[2:]))
+		case "operator":
+			os.Exit(operator(os.Args[2:]))
 		case "version":
 			fmt.Printf("craftnetd %s (wire v%d, schema v%d)\n",
 				buildinfo.Version, buildinfo.WireVersion, sqlite.SchemaVersion)
@@ -44,6 +49,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "Usage:")
 	fmt.Fprintln(os.Stderr, "  craftnetd serve      [-database PATH] [-listen ADDR]")
 	fmt.Fprintln(os.Stderr, "  craftnetd provision  -world ID -central ID [-database PATH] [-gateway-url URL]")
+	fmt.Fprintln(os.Stderr, "  craftnetd operator   -name NAME [-disable] [-list] [-database PATH]")
 	fmt.Fprintln(os.Stderr, "  craftnetd version")
 }
 
@@ -66,6 +72,7 @@ func serve(arguments []string) int {
 	database := flags.String("database", "data/craftnet.db", "SQLite database path")
 	listen := flags.String("listen", "127.0.0.1:8080", "address to listen on")
 	retention := flags.Duration("retention", 30*24*time.Hour, "how long Traffic Events are kept")
+	secure := flags.Bool("secure-cookies", false, "mark the dashboard session cookie HTTPS-only (set this behind TLS)")
 	_ = flags.Parse(arguments)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -79,7 +86,7 @@ func serve(arguments []string) int {
 	defer backing.Close()
 
 	application, err := app.New(app.Options{
-		Store: backing, Retention: *retention, Logf: log.Printf,
+		Store: backing, Retention: *retention, Logf: log.Printf, SecureCookies: *secure,
 	})
 	if err != nil {
 		log.Printf("craftnetd: %v", err)
@@ -165,5 +172,99 @@ func provision(arguments []string) int {
 	fmt.Println()
 	fmt.Println("This is the only time they are shown. The application keeps only")
 	fmt.Println("digests, and cannot print them again.")
+	return 0
+}
+
+//--------------------------------------------------------------------------
+// operator
+//--------------------------------------------------------------------------
+
+// operator creates, re-passwords, disables, or lists the people who can sign in
+// to the dashboard.
+//
+// The password is read from standard input rather than taken as a flag: a flag
+// lands in shell history and in the process list of everyone on the machine,
+// and a dashboard password is the one secret a human types.
+func operator(arguments []string) int {
+	flags := flag.NewFlagSet("operator", flag.ExitOnError)
+	database := flags.String("database", "data/craftnet.db", "SQLite database path")
+	name := flags.String("name", "", "operator name")
+	disable := flags.Bool("disable", false, "stop this operator signing in and end their sessions")
+	list := flags.Bool("list", false, "list the operators")
+	_ = flags.Parse(arguments)
+
+	ctx := context.Background()
+	backing, err := open(ctx, *database)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "craftnetd: %v\n", err)
+		return 1
+	}
+	defer backing.Close()
+
+	application, err := app.New(app.Options{Store: backing})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "craftnetd: %v\n", err)
+		return 1
+	}
+
+	if *list {
+		var operators []store.Operator
+		if err := backing.Do(ctx, func(tx store.Tx) error {
+			found, err := tx.Operators()
+			if err != nil {
+				return err
+			}
+			operators = found
+			return nil
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "craftnetd: %v\n", err)
+			return 1
+		}
+		if len(operators) == 0 {
+			fmt.Println("No operators yet. Add one with: craftnetd operator -name NAME")
+			return 0
+		}
+		for _, held := range operators {
+			status := "enabled"
+			if held.Disabled() {
+				status = "disabled"
+			}
+			fmt.Printf("%-24s %-8s created %s\n", held.Name, status,
+				held.CreatedAt.UTC().Format(time.RFC3339))
+		}
+		return 0
+	}
+
+	if *name == "" {
+		fmt.Fprintln(os.Stderr, "craftnetd: -name is required")
+		return 2
+	}
+
+	if *disable {
+		if err := application.Identities.DisableOperator(ctx, backing, *name); err != nil {
+			fmt.Fprintf(os.Stderr, "craftnetd: %v\n", err)
+			return 1
+		}
+		fmt.Println("Disabled " + *name + ". Their audit history is kept.")
+		return 0
+	}
+
+	fmt.Fprintf(os.Stderr, "Password for %s (at least %d characters; a passphrase is better than a word): ",
+		*name, identity.MinimumPassword)
+	reader := bufio.NewReader(os.Stdin)
+	typed, err := reader.ReadString('\n')
+	if err != nil && typed == "" {
+		fmt.Fprintf(os.Stderr, "\ncraftnetd: no password was given\n")
+		return 2
+	}
+	password := strings.TrimRight(typed, "\r\n")
+	fmt.Fprintln(os.Stderr)
+
+	if err := application.Identities.PutOperator(ctx, backing, *name, password); err != nil {
+		fmt.Fprintf(os.Stderr, "craftnetd: %v\n", err)
+		return 1
+	}
+	fmt.Println("Set the password for " + *name + ".")
+	fmt.Println("Sign in at the address craftnetd serves.")
 	return 0
 }
