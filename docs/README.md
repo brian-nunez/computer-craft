@@ -29,6 +29,23 @@ to do about it.
 **[`contributing.md`](contributing.md)** — the gate, the four test harnesses and
 which to reach for, and how to add an External Operation or a role program.
 
+## The packages
+
+Every package in the `ccpm` registry has a README describing what it hides, its
+public surface, and what it deliberately does not do.
+
+| | |
+|---|---|
+| [`craftnet-protocol`](../packages/craftnet-protocol/README.md) | the v1 wire, in pure Lua |
+| [`craftnet-core`](../packages/craftnet-core/README.md) | pure role state transitions |
+| [`craftnet-runtime`](../packages/craftnet-runtime/README.md) | one configured role, running — the only package that performs I/O |
+| [`craftnet-central`](../packages/craftnet-central/README.md) | the Central Server, and the World's one way out |
+| [`craftnet-isp`](../packages/craftnet-isp/README.md) | an ISP |
+| [`craftnet-router`](../packages/craftnet-router/README.md) | a Customer Router |
+| [`craftnet-computer`](../packages/craftnet-computer/README.md) | a Computer |
+| [`networking`](../packages/networking/README.md) | choosing the right modem |
+| [`peripheral-discovery`](../packages/peripheral-discovery/README.md) | finding what is plugged in |
+
 ## Decisions
 
 [`adr/`](adr/) — one accepted decision per file, in the order they were taken.

@@ -287,6 +287,7 @@ says so.
 ```text
 external/                 Go module, craftnetd, and the protocol implementation
 packages/                 ccpm Lua packages and immutable manifests
+                          each has a README describing what it hides
 spec/protocol/v1/         cross-language protocol fixture catalog
 tests/lua/                portable Lua test runner, support, and suites
 scripts/                  local and CI entry points
