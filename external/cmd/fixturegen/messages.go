@@ -96,8 +96,16 @@ func writeMessages() {
 			"acked_request_id": "req-104", "result_revision": int64(5)}},
 		{"config_request", "operational", "config_request", protocol.Object{
 			"known_revision": int64(0)}},
+		// An ISP assigns only what it owns. The router's own LAN address, pool,
+		// and channel are not the ISP's to send, and at enrollment it has never
+		// been told them.
 		{"config_snapshot for a router", "operational", "config_snapshot", protocol.Object{
-			"revision": int64(4), "role": "router", "configuration": sampleRouterConfiguration()}},
+			"revision": int64(4), "role": "router", "configuration": protocol.Object{
+				"customer_network_id":   "net-farm",
+				"customer_network_name": "farm",
+				"provider_address":      "100.64.7.9",
+				"isp_id":                "isp-acme",
+				"operational_channel":   int64(42102)}}},
 		{"config_snapshot for an isp", "operational", "config_snapshot", protocol.Object{
 			"revision": int64(9), "role": "isp", "configuration": sampleISPConfiguration()}},
 		{"config_snapshot for central", "operational", "config_snapshot", protocol.Object{
@@ -257,6 +265,9 @@ func writeMessages() {
 			protocol.CodeInvalidMessage},
 		{"configuration that does not match its role", "config_snapshot",
 			`{"revision":1,"role":"isp","configuration":{"computer_id":"cmp-h","hostname":"h","address":"192.168.1.20","customer_network_id":"net-farm","router_address":"192.168.1.1","dns_address":"192.168.1.1"}}`,
+			protocol.CodeInvalidMessage},
+		{"an ISP reaching past what it owns on a router", "config_snapshot",
+			`{"revision":1,"role":"router","configuration":{"customer_network_id":"net-farm","customer_network_name":"farm","provider_address":"100.64.7.9","isp_id":"isp-acme","pool_first":"10.0.0.2","pool_last":"10.0.0.99"}}`,
 			protocol.CodeInvalidMessage},
 		{"traffic batch whose range disagrees with its events", "traffic_batch",
 			`{"first_sequence":1,"last_sequence":5,"events":[{"event_id":"evt-1","observed_at_ms":0,"world_id":"world-o","direction":"local","kind":"heartbeat","outcome":"delivered","bytes":0}]}`,

@@ -11,6 +11,7 @@
     "wizard.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-router/files/wizard.lua",
     "bootstrap.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-router/files/bootstrap.lua",
     "setup.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-router/files/setup.lua",
+    "uplink.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-router/files/uplink.lua",
     "startup.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-router/files/startup.lua"
   }
 }

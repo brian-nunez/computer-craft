@@ -49,6 +49,20 @@
           "manifest": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-computer/0.1.0.json"
         }
       }
+    },
+    "craftnet-isp": {
+      "versions": {
+        "0.1.0": {
+          "manifest": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-isp/0.1.0.json"
+        }
+      }
+    },
+    "craftnet-central": {
+      "versions": {
+        "0.1.0": {
+          "manifest": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-central/0.1.0.json"
+        }
+      }
     }
   }
 }

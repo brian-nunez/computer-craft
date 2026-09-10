@@ -23,6 +23,7 @@ local PUBLIC_SURFACE = {
   parentSession = "function",
   discovery = "table",
   handshake = "table",
+  tokens = "table",
   errors = "table",
   limits = "table",
   validate = "table",
@@ -85,10 +86,10 @@ test("a caller completes a full exchange without touching any crypto", function(
     parent_id = "rtr-farm",
     parent_revision = 4,
     parent_nonce = string.rep("cd", 32),
+    relationship_id = "rel-farm-0007",
     assign = function()
       return {
         child_id = "cmp-harvester",
-        relationship_id = "rel-farm-0007",
         operational_channel = 3100,
         configuration = protocol.object({
           computer_id = "cmp-harvester",
@@ -125,10 +126,10 @@ test("a LAN password admits a computer once and a wrong one never does", functio
       parent_id = "rtr-farm",
       parent_revision = 4,
       parent_nonce = string.rep("cd", 32),
+      relationship_id = "rel-farm-0007",
       assign = function()
         return {
           child_id = "cmp-harvester",
-          relationship_id = "rel-farm-0007",
           operational_channel = 3100,
           configuration = protocol.object({
             computer_id = "cmp-harvester", hostname = "harvester",

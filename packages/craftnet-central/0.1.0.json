@@ -1,0 +1,16 @@
+{
+  "name": "craftnet-central",
+  "version": "0.1.0",
+  "dependencies": {
+    "craftnet-runtime": "^0.1.0"
+  },
+  "files": {
+    "init.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-central/files/init.lua",
+    "central.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-central/files/central.lua",
+    "wizard.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-central/files/wizard.lua",
+    "bootstrap.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-central/files/bootstrap.lua",
+    "setup.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-central/files/setup.lua",
+    "token.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-central/files/token.lua",
+    "startup.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-central/files/startup.lua"
+  }
+}

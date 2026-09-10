@@ -12,9 +12,11 @@ local lan = internal("lan")
 
 local router = {}
 
--- The shared discovery channel a Computer calls out on. Fixture value from the
--- reference topology; a wizard may choose another.
+-- The shared discovery channels: the one a Computer calls out on, and the one
+-- this router calls out to an ISP on. Fixture values from the reference
+-- topology; a wizard may choose others.
 router.LAN_DISCOVERY_CHANNEL = 42002
+router.ISP_DISCOVERY_CHANNEL = 42001
 
 local Router = {}
 Router.__index = Router
@@ -163,6 +165,123 @@ function Router:revoke(relationshipId)
   if childId then
     self.runtime:submit({ kind = "release_binding", computer_id = childId })
   end
+  return true
+end
+
+--------------------------------------------------------------------------
+-- Enrolling with an ISP
+--------------------------------------------------------------------------
+
+-- enrollUpstream spends a one-time Router Enrollment Token. What comes back is
+-- the Provider Address and Operational Channel the ISP assigned, and the
+-- durable Router Credential every later reconnect uses.
+--
+-- A Customer Network works perfectly well without this: Milestone 4 built one
+-- that never had an ISP. Enrolling is what makes it reachable from the rest of
+-- CraftNet.
+function Router:enrollUpstream(options)
+  assert(type(options) == "table" and options.token, "a Router Enrollment Token is required")
+  local state = self:state()
+  assert(state.router_id, "run the router wizard before enrolling with an ISP")
+
+  local secret = protocol.tokens.secret(options.token)
+  if not secret then
+    return nil, "invalid_message", "that is not a CraftNet enrollment token"
+  end
+
+  local generation = (state.enroll_attempt or 0) + 1
+  state.enroll_attempt = generation
+
+  local result, code, problem = runtimePackage.enroll.child({
+    transport = self.transport,
+    clock = self.clock,
+    discovery_channel = options.discovery_channel or router.ISP_DISCOVERY_CHANNEL,
+    secret = secret,
+    role = "router",
+    requested_name = state.customer_network_name,
+    -- This Customer Network already has an identity, earned when its Operator
+    -- set it up. The ISP decides whether to accept it, not what it is.
+    client_id = state.router_id,
+    number = options.number or 0,
+    generation = generation,
+    timeout_ms = options.timeout_ms,
+    expect_display_name = options.isp_name,
+    expect_parent_id = state.isp_id,
+  })
+  if not result then return nil, code, problem end
+
+  local assigned = result.configuration
+  if rawget(assigned, "customer_network_id") ~= state.customer_network_id then
+    return nil, "name_conflict",
+      "that ISP already serves a different Customer Network by this name"
+  end
+
+  self:applyAssignment(assigned, result)
+  return {
+    isp_id = rawget(assigned, "isp_id"),
+    provider_address = rawget(assigned, "provider_address"),
+    operational_channel = result.operational_channel,
+    relationship_id = result.relationship_id,
+  }
+end
+
+-- applyAssignment takes only the fields an ISP is authoritative for. This
+-- router's own LAN address, pool, and channel are not among them.
+function Router:applyAssignment(assigned, result)
+  local state = self:state()
+  state.isp_id = rawget(assigned, "isp_id")
+  state.provider_address = rawget(assigned, "provider_address")
+  state.customer_network_name = rawget(assigned, "customer_network_name")
+    or state.customer_network_name
+  state.upstream_relationship_id = result.relationship_id
+  state.upstream_channel = result.operational_channel
+  state.upstream_credential_ref = self:secretReference(result.relationship_id)
+  state.parent_revision = result.parent_revision
+
+  self.secrets:put(state.upstream_credential_ref, result.relationship_credential)
+  self.runtime.store:save(state, self.clock:now())
+  return state
+end
+
+function Router:establishUpstream()
+  local state = self:state()
+  local credential = self.secrets:get(state.upstream_credential_ref or "")
+  if not credential then return nil, "this router has no Router Credential" end
+  state.upstream_session_generation = (state.upstream_session_generation or 0) + 1
+
+  local result, code, problem = runtimePackage.enroll.session({
+    transport = self.transport,
+    clock = self.clock,
+    credential = credential,
+    relationship_id = state.upstream_relationship_id,
+    operational_channel = state.upstream_channel,
+    role = "router",
+    generation = state.upstream_session_generation,
+    child_revision = state.revision or 0,
+  })
+  if not result then return nil, problem or code end
+  return result.session
+end
+
+-- connectUpstream brings this Customer Network onto CraftNet.
+function Router:connectUpstream()
+  local state = self:state()
+  if not state.upstream_relationship_id then
+    return nil, "upstream_unavailable", "this Customer Router has not enrolled with an ISP"
+  end
+  local session, problem = self:establishUpstream()
+  if not session then return nil, "upstream_unavailable", problem end
+
+  self.links:adopt({
+    relationship_id = state.upstream_relationship_id,
+    channel = state.upstream_channel,
+    credential = self.secrets:get(state.upstream_credential_ref),
+    session = session,
+    role = "isp",
+    id = state.isp_id,
+    direction = "parent",
+  })
+  self.runtime:drain()
   return true
 end
 

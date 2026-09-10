@@ -12,6 +12,7 @@
     "errors.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/errors.lua",
     "schema.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/schema.lua",
     "keys.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/keys.lua",
+    "tokens.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/tokens.lua",
     "frame.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/frame.lua",
     "handshake.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/handshake.lua",
     "link.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/link.lua"

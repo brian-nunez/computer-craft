@@ -136,11 +136,13 @@ function Bench:serveWhile(name, body)
   return self
 end
 
-local function joinOptions(hostname, password)
+-- joinOptions names the Customer Network the Operator meant, so a Computer in
+-- range of two routers joins the one it was told to.
+local function joinOptions(hostname, password, networkName)
   return {
     password = password or PASSWORD,
     hostname = hostname,
-    customer_network_name = "home",
+    customer_network_name = networkName or "home",
     isp_name = "acme",
     world_id = "world-overworld",
     timeout_ms = 3000,
@@ -340,7 +342,8 @@ test("Home and Farm both allocate .20 and .21 from the identical pool", function
     for index, host in ipairs(hosts) do
       local node = bench:addComputer(host, index)
       bench:serveWhile(host, function()
-        results[network[2]][host] = assert(node:joinNetwork(joinOptions(host)))
+        results[network[2]][host] =
+          assert(node:joinNetwork(joinOptions(host, nil, network[2])))
       end)
     end
   end

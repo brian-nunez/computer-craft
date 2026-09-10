@@ -121,6 +121,42 @@ test("an installed role package runs from its locked path", function()
   assertTrue(#routerPackage.wizard.questions > 0, "with its setup questions")
 end)
 
+test("installing an ISP or a Central Server brings its dependencies too", function()
+  for _, role in ipairs({ "craftnet-isp", "craftnet-central" }) do
+    local lock = lockOf(install(role))
+    for _, expected in ipairs({
+      role, "craftnet-runtime", "craftnet-core", "craftnet-protocol",
+      "networking", "peripheral-discovery",
+    }) do
+      assertTrue(lock.packages[expected] ~= nil,
+        expected .. " is missing after installing " .. role)
+    end
+  end
+end)
+
+test("every role package runs from its locked path", function()
+  -- All four roles are loaded from what ccpm actually installed, so a manifest
+  -- that forgot a module fails here rather than on a Computer.
+  for _, role in ipairs({ "craftnet-router", "craftnet-computer", "craftnet-isp", "craftnet-central" }) do
+    local host = install(role)
+    local lock = lockOf(host)
+    local root = materialize(host)
+    local function installedPath(name)
+      return root .. "/.ccpm/packages/" .. name .. "/" .. lock.packages[name].version .. "/init.lua"
+    end
+
+    local protocol = dofile(installedPath("craftnet-protocol"))
+    local core = dofile(installedPath("craftnet-core")).withProtocol(protocol)
+    local runtime = dofile(installedPath("craftnet-runtime"))
+      .withPackages({ protocol = protocol, core = core })
+    local rolePackage = dofile(installedPath(role))
+      .withPackages({ protocol = protocol, core = core, runtime = runtime })
+
+    assertEqual(rolePackage.name, role, role .. " loaded")
+    assertEqual(type(rolePackage.new), "function", role .. " can build a node")
+  end
+end)
+
 test("a package outside the registry is refused rather than guessed at", function()
   local os = fakeCraftOS.new({ raw_prefix = RAW_PREFIX, root = "." })
   os:run("ccpm.lua", { "install", "craftnet-nonsense" })

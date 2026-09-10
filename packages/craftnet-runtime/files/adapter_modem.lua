@@ -1,58 +1,104 @@
--- The modem transport.
+-- The modem transport and its Logical Interfaces.
 --
--- This is where CraftNet meets a real peripheral, and it is deliberately the
--- dumbest layer in the package: open a channel, put bytes on it, take bytes
--- off it. It knows nothing about sessions, relationships, or CraftNet at all,
--- which is what lets everything above it be tested with a transport made of a
--- table.
+-- A Logical Interface binds one infrastructure role -- upstream, downstream, or
+-- local -- to a modem and the channels it carries. An ISP reaches the Central
+-- Server over an Ender modem and its Customer Routers over another; a Customer
+-- Router faces its ISP over an Ender modem and its Computers over an ordinary
+-- LAN modem. Which modem a frame leaves on is a property of the channel, not
+-- something a caller has to know.
+--
+-- CraftOS raises `modem_message` for every open channel on every modem through
+-- the same event queue, so one transport can serve several interfaces without
+-- anything above it noticing. That is why this is still the dumbest layer in
+-- the package: open a channel, put bytes on it, take bytes off it.
 
 local adapter = {}
 
 local Modem = {}
 Modem.__index = Modem
 
--- new selects a modem through the existing `networking` package, or takes one
--- already wrapped. Selection is deterministic: Ender first, then wired, then
--- ordinary wireless, ties broken by peripheral name.
+-- The reference discovery channels. A wizard may choose others; these are what
+-- the acceptance topology uses.
+adapter.CENTRAL_DISCOVERY = 42000
+adapter.ISP_DISCOVERY = 42001
+adapter.LAN_DISCOVERY = 42002
+
+-- new takes either one modem or a set of named interfaces:
+--
+--   adapter.new({ networking = networking })
+--   adapter.new({ interfaces = {
+--     { name = "upstream",   modem = ender, channels = { 42000 } },
+--     { name = "downstream", modem = lan,   channels = { 42002 } },
+--   } })
 function adapter.new(options)
   options = options or {}
-  local modem = options.modem
-  local name, kind = options.modem_name, options.modem_kind
+  local interfaces = {}
 
-  if not modem and options.networking then
-    local selected = options.networking.selectModem(options.selection or {})
-    assert(selected, "no modem is attached to this Computer")
-    modem, name, kind = selected.wrapped, selected.name, selected.kind
+  if options.interfaces then
+    for _, spec in ipairs(options.interfaces) do
+      assert(type(spec.modem) == "table" and type(spec.modem.transmit) == "function",
+        "a Logical Interface needs a wrapped modem")
+      interfaces[#interfaces + 1] = {
+        name = spec.name or ("interface-" .. #interfaces + 1),
+        modem = spec.modem,
+        modem_name = spec.modem_name,
+        kind = spec.kind,
+        channels = spec.channels or {},
+      }
+    end
+  else
+    local modem, name, kind = options.modem, options.modem_name, options.modem_kind
+    if not modem and options.networking then
+      local selected = options.networking.selectModem(options.selection or {})
+      assert(selected, "no modem is attached to this Computer")
+      modem, name, kind = selected.wrapped, selected.name, selected.kind
+    end
+    assert(type(modem) == "table" and type(modem.transmit) == "function",
+      "the modem transport needs a wrapped modem")
+    interfaces[1] = { name = "default", modem = modem, modem_name = name, kind = kind }
   end
-  assert(type(modem) == "table" and type(modem.transmit) == "function",
-    "the modem transport needs a wrapped modem")
 
-  return setmetatable({
-    modem = modem,
-    name = name,
-    kind = kind,
+  local transport = setmetatable({
+    interfaces = interfaces,
+    byChannel = {},
   }, Modem)
+
+  -- A channel named by an interface belongs to it. Anything else falls to the
+  -- first interface, which is what a single-modem Computer always uses.
+  for _, interface in ipairs(interfaces) do
+    for _, channel in ipairs(interface.channels) do
+      transport.byChannel[channel] = interface
+    end
+  end
+  return transport
+end
+
+function Modem:interfaceFor(channel)
+  return self.byChannel[channel] or self.interfaces[1]
 end
 
 function Modem:open(channel)
-  if not self.modem.isOpen(channel) then self.modem.open(channel) end
+  local interface = self:interfaceFor(channel)
+  if not interface.modem.isOpen(channel) then interface.modem.open(channel) end
   return true
 end
 
 function Modem:close(channel)
-  if self.modem.isOpen(channel) then self.modem.close(channel) end
+  local interface = self:interfaceFor(channel)
+  if interface.modem.isOpen(channel) then interface.modem.close(channel) end
   return true
 end
 
 function Modem:transmit(channel, replyChannel, text)
-  local ok, problem = pcall(self.modem.transmit, channel, replyChannel, text)
+  local interface = self:interfaceFor(channel)
+  local ok, problem = pcall(interface.modem.transmit, channel, replyChannel, text)
   if not ok then return nil, tostring(problem) end
   return true
 end
 
--- receive waits for one modem message, or for the timeout. Anything that is not
--- a string on an open channel is ignored rather than surfaced: a shared channel
--- carries other programs' traffic too.
+-- receive waits for one modem message on any interface, or for the timeout.
+-- Anything that is not a string is ignored rather than surfaced: a shared
+-- channel carries other programs' traffic too.
 function Modem:receive(timeoutMs)
   local timer
   if timeoutMs and timeoutMs >= 0 then
@@ -66,15 +112,30 @@ function Modem:receive(timeoutMs)
     elseif event == "modem_message" and type(message) == "string" then
       if timer then os.cancelTimer(timer) end
       return channel, replyChannel, message
-    elseif event == "peripheral_detach" and first == self.name then
-      if timer then os.cancelTimer(timer) end
-      return nil, "detached"
+    elseif event == "peripheral_detach" then
+      for _, interface in ipairs(self.interfaces) do
+        if interface.modem_name == first then
+          if timer then os.cancelTimer(timer) end
+          return nil, "detached", interface.name
+        end
+      end
     end
   end
 end
 
+-- describe is what a screen or a diagnostic shows: which modem serves which
+-- role, and nothing about what travels on it.
 function Modem:describe()
-  return { name = self.name, kind = self.kind }
+  local described = {}
+  for index, interface in ipairs(self.interfaces) do
+    described[index] = {
+      name = interface.name,
+      modem = interface.modem_name,
+      kind = interface.kind,
+      channels = interface.channels,
+    }
+  end
+  return described
 end
 
 return adapter

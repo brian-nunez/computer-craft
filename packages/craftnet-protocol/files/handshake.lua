@@ -50,6 +50,7 @@ function handshake.childEnrollment(options)
     clientId = options.client_id,
     requestId = options.request_id,
     childRevision = options.child_revision or 0,
+    expectParentId = options.expect_parent_id,
     stage = "open",
   }, ChildEnrollment)
 end
@@ -85,6 +86,12 @@ function ChildEnrollment:receiveChallenge(text)
   local body = message.body
   if rawget(body, "client_nonce") ~= self.clientNonce then
     return fail("replay_rejected", "challenge echoes a different client nonce")
+  end
+  -- Several parents can hear the same discovery channel, and where they share a
+  -- secret several can answer. A child enrolls with the one it chose, not with
+  -- whoever replied first.
+  if self.expectParentId and rawget(body, "parent_id") ~= self.expectParentId then
+    return fail("authentication_failed", "challenge came from another parent")
   end
 
   self.parentId = rawget(body, "parent_id")
@@ -143,7 +150,10 @@ function ChildEnrollment:receiveAccept(text)
   if self.clientId ~= nil and rawget(body, "child_id") ~= self.clientId then
     return fail("authentication_failed", "accept reassigns an existing child identity")
   end
-  local ok, configurationMessage = schema.validateConfiguration(self.role, rawget(body, "configuration"))
+  -- What a parent assigns is narrower than a child's complete configuration
+  -- wherever the child owns part of it, so this is checked against the
+  -- assignment shape rather than the whole thing.
+  local ok, configurationMessage = schema.validateAssignment(self.role, rawget(body, "configuration"))
   if not ok then return fail("invalid_message", configurationMessage) end
 
   self.stage = "enrolled"
@@ -169,8 +179,12 @@ ParentEnrollment.__index = ParentEnrollment
 -- and configuration the parent alone owns; it is called only after the child's
 -- proof verifies.
 function handshake.parentEnrollment(options)
-  requireFields(options, { "enrollment_secret", "parent_id", "parent_revision", "parent_nonce", "assign" })
+  requireFields(options, {
+    "enrollment_secret", "parent_id", "parent_revision", "parent_nonce",
+    "relationship_id", "assign",
+  })
   assert(schema.scalars.id(options.parent_id), "parent_id must be a CraftNet ID")
+  assert(schema.scalars.id(options.relationship_id), "relationship_id must be a CraftNet ID")
   assert(schema.scalars.nonce(options.parent_nonce), "parent_nonce must be 32 lowercase hex bytes")
   assert(type(options.assign) == "function", "assign must be a function")
   return setmetatable({
@@ -178,6 +192,7 @@ function handshake.parentEnrollment(options)
     parentId = options.parent_id,
     parentRevision = options.parent_revision,
     parentNonce = options.parent_nonce,
+    relationshipId = options.relationship_id,
     assign = options.assign,
     stage = "open",
   }, ParentEnrollment)
@@ -198,15 +213,9 @@ function ParentEnrollment:receiveOpen(text)
   self.clientNonce = rawget(body, "client_nonce")
   self.clientId = rawget(body, "client_id")
 
-  local assignment, assignCode, assignMessage = self.assign({
-    role = self.role,
-    requested_name = self.requestedName,
-    client_id = self.clientId,
-  })
-  if not assignment then return fail(assignCode or "internal_error", assignMessage) end
-  self.assignment = assignment
-  self.relationshipId = assignment.relationship_id
-
+  -- Nothing is assigned yet. A child that walks away after the challenge must
+  -- cost this parent nothing durable, so an address, an identity, and a
+  -- Provider Address are all committed at the confirm step instead.
   self.transcript = keys.enrollmentTranscript({
     child_id = self.clientId,
     requested_name = self.requestedName,
@@ -254,11 +263,21 @@ function ParentEnrollment:receiveConfirm(text)
     return fail("replay_rejected", "confirm does not echo the challenge nonces")
   end
 
+  -- The child has now proved the whole exchange, so it is worth spending
+  -- something on it.
+  local assignment, assignCode, assignMessage = self.assign({
+    role = self.role,
+    requested_name = self.requestedName,
+    client_id = self.clientId,
+  })
+  if not assignment then return fail(assignCode or "internal_error", assignMessage) end
+  self.assignment = assignment
+
   local acceptBody = cj1.object({
-    child_id = self.assignment.child_id,
+    child_id = assignment.child_id,
     relationship_id = self.relationshipId,
-    operational_channel = self.assignment.operational_channel,
-    configuration = self.assignment.configuration,
+    operational_channel = assignment.operational_channel,
+    configuration = assignment.configuration,
     parent_revision = self.parentRevision,
   })
   local acceptText, acceptCode, acceptMessage =
@@ -267,7 +286,7 @@ function ParentEnrollment:receiveConfirm(text)
 
   self.stage = "enrolled"
   return acceptText, {
-    child_id = self.assignment.child_id,
+    child_id = assignment.child_id,
     relationship_id = self.relationshipId,
     relationship_credential = self.credential,
     child_revision = rawget(body, "child_revision"),

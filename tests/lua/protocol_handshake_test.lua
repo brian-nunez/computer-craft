@@ -39,10 +39,10 @@ local function enroll(options)
     parent_id = "central-overworld",
     parent_revision = 12,
     parent_nonce = PARENT_NONCE,
+    relationship_id = "rel-acme-0001",
     assign = function(request)
       return {
         child_id = "isp-acme",
-        relationship_id = "rel-acme-0001",
         operational_channel = 2100,
         configuration = ispConfiguration(request.requested_name),
       }
