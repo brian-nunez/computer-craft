@@ -1,3 +1,18 @@
+-- Choosing the right modem.
+--
+-- A Computer may have several modems attached and CraftNet cares which: an
+-- Ender modem reaches the Central Server across the World, a wired or wireless
+-- one serves a LAN. This classifies each modem it finds -- ender, wired, or
+-- wireless -- and orders them by that preference, so a caller asks for the
+-- modem it needs rather than guessing at a side.
+--
+-- Classification is by capability, with `options.kinds` available to name a
+-- modem explicitly when a build is unusual.
+--
+-- CraftNet reaches this through craftnet-runtime's modem adapter, which is the
+-- only file that turns a modem into a CraftNet Logical Interface. This package
+-- predates CraftNet and knows nothing about it.
+
 local function loadDependency(name, file)
   local handle = assert(fs.open("/.ccpm/lock.json", "r"), "ccpm lock file not found")
   local lock = textutils.unserialiseJSON(handle.readAll())

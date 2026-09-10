@@ -1,3 +1,15 @@
+-- Finding what is plugged into a Computer.
+--
+-- CC:Tweaked reports peripherals by side or network name, with a type and a
+-- method list, and nothing that says which of two modems is the one you meant.
+-- This turns that into a uniform record -- name, type, every type it answers
+-- to, its methods, and the wrapped table -- so callers select on what a device
+-- can do rather than on where it happens to be attached.
+--
+-- CraftNet depends on this through the `networking` package. It predates
+-- CraftNet and is not part of it: nothing here knows a Logical Interface from a
+-- monitor.
+
 local discovery = {}
 
 local function packed(fn, ...)
