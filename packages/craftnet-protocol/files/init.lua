@@ -39,6 +39,7 @@ local keys = internal("keys")
 local limits = internal("limits")
 local link = internal("link")
 local schema = internal("schema")
+local tokens = internal("tokens")
 
 local protocol = {
   name = "craftnet-protocol",
@@ -84,6 +85,11 @@ protocol.handshake = {
   seal = frame.sealHandshake,
   open = frame.openHandshake,
 }
+
+-- One-time enrollment tokens. A parent issues one, an Operator carries it to a
+-- child, and the child proves the exchange under it exactly as a Computer
+-- proves a LAN join under a LAN Password.
+protocol.tokens = tokens
 
 --------------------------------------------------------------------------
 -- Errors and limits

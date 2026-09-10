@@ -5,13 +5,14 @@ model one Central Server, multiple ISPs, Customer Routers, and Computers, while
 the Go External Application provides the controlled WebSocket gateway and
 operator dashboard.
 
-Implementation Milestone 4 is complete in simulation: an Operator can now build
-a Customer Network. `craftnet-router` and `craftnet-computer` add the setup and
-join wizards, LAN Password admission, local DNS, and local traffic on top of the
-three shared packages. Its in-world acceptance run has not been performed yet —
-see [the checklist](docs/implementation/acceptance/milestone-4-in-world.md).
-Traffic between Customer Networks intentionally begins in Milestone 5. The
-complete design and delivery gates are indexed in
+Implementation Milestone 5 is complete in simulation: the whole hierarchy now
+exists. `craftnet-central` and `craftnet-isp` join the Customer Networks
+together, one-time enrollment tokens carry an Operator from one Computer to the
+next, and traffic crosses between networks through the Central Server. Its
+in-world acceptance run has not been performed yet — see
+[the checklist](docs/implementation/acceptance/milestone-5-in-world.md). The Go
+External Application intentionally begins in Milestone 6. The complete design
+and delivery gates are indexed in
 [the CraftNet v1 map](.scratch/craftnet-v1/map.md), and completed-gate evidence
 is recorded under [`docs/implementation/`](docs/implementation/).
 
@@ -31,7 +32,7 @@ local feedback.
 
 ## Development commands
 
-Run the complete Milestone 4 gate from the repository root:
+Run the complete Milestone 5 gate from the repository root:
 
 ```bash
 make test
@@ -162,6 +163,28 @@ address, its default gateway, and its DNS. The password is used exactly once:
 what is kept is a LAN Credential unique to that Computer, which can be revoked
 on its own and which is what every later reconnect uses.
 
+## Building the whole World
+
+Provision the root secrets outside Minecraft, then carry them in:
+
+```bash
+cd external && go run ./cmd/craftnetprov -out ../data/world.json
+```
+
+| Computer | Install | Then run |
+|---|---|---|
+| Central Server | `ccpm install craftnet-central` | `setup`, then `token` |
+| ISP | `ccpm install craftnet-isp` | `setup` with that token, then `token` |
+| Customer Router | `ccpm install craftnet-router` | `setup`, then `uplink` with that token |
+| Computer | `ccpm install craftnet-computer` | `setup` with the LAN Password |
+
+Each token is one-time and 16 characters in four groups, short enough to read
+off one screen and type into another. A parent stores no token — only which
+counters it has spent.
+
+A Customer Network works perfectly well without an ISP. `uplink` is what makes
+it reachable from another one.
+
 ## Provisioning a development World
 
 The External Application owns the root secrets. Generate a development World Key
@@ -224,8 +247,10 @@ local runtime = dofile("/.ccpm/packages/craftnet-runtime/0.1.0/init.lua")
   .withPackages({ protocol = protocol, core = core })
 ```
 
-`craftnet-router` and `craftnet-computer` are composition roots over those
-three. `craftnet-isp` and `craftnet-central` arrive in Milestone 5.
+`craftnet-central`, `craftnet-isp`, `craftnet-router`, and `craftnet-computer`
+are composition roots over those three. Each wires them together and supplies
+only what is genuinely its own; none carries a second implementation of
+protocol, persistence, or routing.
 
 ## ccpm
 

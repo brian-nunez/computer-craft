@@ -224,18 +224,19 @@ function handlers.configurationFor(engine, link)
   if not router then
     return nil, "name_not_found", "that Customer Router is not registered"
   end
-  local declared = router.declared or {}
-  return protocol.object({
+  -- Only what this ISP is authoritative for. The router's LAN address, pool,
+  -- and channel are its own, and inventing plausible values for them here would
+  -- put numbers on the wire that nobody meant.
+  local assignment = protocol.object({
     customer_network_id = router.customer_network_id,
     customer_network_name = router.customer_network_name,
     provider_address = router.provider_address,
     isp_id = engine.state.isp_id,
-    router_address = declared.router_address or "192.168.1.1",
-    dns_address = declared.dns_address or declared.router_address or "192.168.1.1",
-    pool_first = declared.pool_first or "192.168.1.20",
-    pool_last = declared.pool_last or "192.168.1.39",
-    lan_operational_channel = declared.lan_operational_channel or 0,
   })
+  if router.operational_channel then
+    rawset(assignment, "operational_channel", router.operational_channel)
+  end
+  return assignment
 end
 
 -- applyConfiguration takes what the Central Server owns for this ISP.

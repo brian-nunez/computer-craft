@@ -25,4 +25,15 @@ if not router:state().router_id then
   return
 end
 
+-- A Customer Network that has enrolled with an ISP comes back onto CraftNet.
+-- One that has not simply serves its own LAN, which is a complete network in
+-- its own right.
+if router:state().upstream_relationship_id then
+  local connected, connectCode, connectProblem = router:connectUpstream()
+  if not connected then
+    printError("waiting for " .. tostring(router:state().isp_id)
+      .. ": " .. tostring(connectProblem or connectCode))
+  end
+end
+
 router:run()

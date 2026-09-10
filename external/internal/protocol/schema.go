@@ -300,6 +300,27 @@ var configurations = map[string]shape{
 	}},
 }
 
+// What a parent assigns to a child is not the same as a child's complete
+// configuration. An ISP owns a Customer Router's identity, name, and Provider
+// Address; it does not own that router's LAN address, pool, or channel, and at
+// enrollment it has never even been told them. So enroll_accept and
+// config_snapshot validate against what the parent is authoritative for, while
+// `configurations` stays the complete self-description a role publishes.
+var assignments = map[string]shape{
+	"computer": configurations["computer"],
+	"router": {
+		required: map[string]string{
+			"customer_network_id":   "id",
+			"customer_network_name": "normalized_name",
+			"provider_address":      "provider_address",
+			"isp_id":                "id",
+		},
+		optional: map[string]string{"operational_channel": "channel"},
+	},
+	"isp":     configurations["isp"],
+	"central": configurations["central"],
+}
+
 var bodies = map[string]shape{
 	"discover": {required: map[string]string{"role": "role", "client_nonce": "nonce"}},
 	"offer": {required: map[string]string{
@@ -344,7 +365,7 @@ var bodies = map[string]shape{
 		check: func(value Object) (string, string) {
 			role, _ := stringValue(value["role"])
 			configuration, _ := value["configuration"].(Object)
-			if err := ValidateConfiguration(role, configuration); err != nil {
+			if err := ValidateAssignment(role, configuration); err != nil {
 				return err.Error(), CodeOf(err)
 			}
 			return "", ""
@@ -586,6 +607,16 @@ func ValidateConfiguration(role string, configuration Object) error {
 	definition, ok := configurations[role]
 	if !ok {
 		return newError(CodeInvalidMessage, "configuration role %q is unknown", role)
+	}
+	return validateShape(definition, configuration, "configuration")
+}
+
+// ValidateAssignment checks what a parent hands a child, which is narrower than
+// that child's complete configuration wherever the child owns some of it.
+func ValidateAssignment(role string, configuration Object) error {
+	definition, ok := assignments[role]
+	if !ok {
+		return newError(CodeInvalidMessage, "assignment role %q is unknown", role)
 	}
 	return validateShape(definition, configuration, "configuration")
 }

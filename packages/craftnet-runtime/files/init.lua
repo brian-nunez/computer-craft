@@ -59,6 +59,7 @@ function runtimePackage.withPackages(packages)
   local secrets = internal("secrets")
   local screen = internal("screen")
   local links = internal("links")
+  local enroll = internal("enroll")
 
   return {
     name = runtimePackage.name,
@@ -77,6 +78,11 @@ function runtimePackage.withPackages(packages)
     -- newLinks builds the session-carrying links adapter over any transport,
     -- which is what makes a whole vertical slice testable without a modem.
     newLinks = links.new,
+
+    -- enroll is the parent-child exchange every boundary in CraftNet shares.
+    -- A role package supplies only what is its own: which secrets are valid,
+    -- what to assign, and what to do with the credential that comes out.
+    enroll = enroll,
 
     -- The real CraftOS adapters. They are the only files in CraftNet that
     -- reference fs, os, or peripheral, and they are loaded on demand so that a

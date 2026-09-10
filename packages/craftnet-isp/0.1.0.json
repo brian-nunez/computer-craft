@@ -1,0 +1,16 @@
+{
+  "name": "craftnet-isp",
+  "version": "0.1.0",
+  "dependencies": {
+    "craftnet-runtime": "^0.1.0"
+  },
+  "files": {
+    "init.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-isp/files/init.lua",
+    "isp.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-isp/files/isp.lua",
+    "wizard.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-isp/files/wizard.lua",
+    "bootstrap.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-isp/files/bootstrap.lua",
+    "setup.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-isp/files/setup.lua",
+    "token.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-isp/files/token.lua",
+    "startup.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-isp/files/startup.lua"
+  }
+}

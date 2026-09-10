@@ -97,6 +97,10 @@ function Computer:joinNetwork(options)
     -- the same address rather than being treated as a new Computer.
     client_id = state.computer_id,
     timeout_ms = options.timeout_ms,
+    customer_network_name = options.customer_network_name,
+    -- A Computer that has joined before returns only to the router identity it
+    -- joined, never to another network that shares a name or a password.
+    router_id = state.router_id,
   })
   if not result then return nil, code, problem end
 

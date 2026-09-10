@@ -121,6 +121,12 @@
       "name": "configuration that does not match its role"
     },
     {
+      "body": "{\"revision\":1,\"role\":\"router\",\"configuration\":{\"customer_network_id\":\"net-farm\",\"customer_network_name\":\"farm\",\"provider_address\":\"100.64.7.9\",\"isp_id\":\"isp-acme\",\"pool_first\":\"10.0.0.2\",\"pool_last\":\"10.0.0.99\"}}",
+      "error": "invalid_message",
+      "kind": "config_snapshot",
+      "name": "an ISP reaching past what it owns on a router"
+    },
+    {
       "body": "{\"first_sequence\":1,\"last_sequence\":5,\"events\":[{\"event_id\":\"evt-1\",\"observed_at_ms\":0,\"world_id\":\"world-o\",\"direction\":\"local\",\"kind\":\"heartbeat\",\"outcome\":\"delivered\",\"bytes\":0}]}",
       "error": "invalid_message",
       "kind": "traffic_batch",

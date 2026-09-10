@@ -300,6 +300,30 @@ local configurations = {
 
 schema.configurations = configurations
 
+-- What a parent assigns to a child is not the same as a child's complete
+-- configuration. An ISP owns a Customer Router's identity, name, and Provider
+-- Address; it does not own that router's LAN address, pool, or channel, and at
+-- enrollment it has never even been told them. So `enroll_accept` and
+-- `config_snapshot` validate against what the parent is authoritative for,
+-- while `configurations` above stays the complete self-description a role
+-- publishes about itself.
+local assignments = {
+  computer = configurations.computer,
+  router = {
+    required = {
+      customer_network_id = "id",
+      customer_network_name = "normalized_name",
+      provider_address = "provider_address",
+      isp_id = "id",
+    },
+    optional = { operational_channel = "channel" },
+  },
+  isp = configurations.isp,
+  central = configurations.central,
+}
+
+schema.assignments = assignments
+
 --------------------------------------------------------------------------
 -- Message body schemas
 --------------------------------------------------------------------------
@@ -372,7 +396,7 @@ local bodies = {
   config_snapshot = {
     required = { revision = "revision", role = "role", configuration = "object" },
     check = function(value)
-      return schema.validateConfiguration(rawget(value, "role"), rawget(value, "configuration"))
+      return schema.validateAssignment(rawget(value, "role"), rawget(value, "configuration"))
     end,
   },
   dns_query = { required = { name = "string" } },
@@ -598,6 +622,14 @@ end
 function schema.validateConfiguration(role, configuration)
   local shape = configurations[role]
   if not shape then return false, "configuration role '" .. tostring(role) .. "' is unknown" end
+  return validateShape(shape, configuration, "configuration")
+end
+
+-- validateAssignment checks what a parent hands a child, which is narrower than
+-- that child's complete configuration wherever the child owns some of it.
+function schema.validateAssignment(role, configuration)
+  local shape = assignments[role]
+  if not shape then return false, "assignment role '" .. tostring(role) .. "' is unknown" end
   return validateShape(shape, configuration, "configuration")
 end
 
