@@ -75,9 +75,9 @@ function wizard.validate(key, value)
   return nil, "'" .. tostring(key) .. "' is not a setup question"
 end
 
--- bundle is what the Central Server provisions from. It is the same shape the
--- Go `craftnetprov` command writes, so an Operator can read the values straight
--- out of that file.
+-- bundle is what the Central Server provisions from. It is the same shape
+-- `craftnetd provision` prints, so an Operator reads the values straight off
+-- that output -- which is the only time the application shows them.
 function wizard.bundle(answers)
   return {
     world_id = answers.world_id,

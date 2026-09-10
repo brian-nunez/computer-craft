@@ -639,3 +639,9 @@ func ValidateIdentifier(value string) error {
 	}
 	return nil
 }
+
+// IsOperationName reports whether value is a valid External Operation or
+// service name: 1 to 64 lowercase letters, digits, dots, underscores, hyphens.
+func IsOperationName(value string) bool {
+	return isOperationName(value)
+}

@@ -575,3 +575,98 @@ test("no ISP can register a route in another ISP's name", function()
   assertEqual(world.central:state().routes["network-home"].isp_id, "isp-acme",
     "Acme keeps the route")
 end)
+
+--------------------------------------------------------------------------
+-- With the External Application switched off
+--------------------------------------------------------------------------
+
+test("internal traffic carries on with no Gateway Session at all", function()
+  local world = fullWorld()
+  -- No gateway adapter was ever wired: this is exactly what a stopped
+  -- craftnetd looks like from in world.
+  assertTrue(world.central.runtime.adapters.gateway == nil, "there is no Gateway")
+
+  -- Scenario 5: local delivery, entirely inside Home.
+  local localReply = world:ask("alex-pc", {
+    customer_network_id = "network-home",
+    computer_id = world.bindings["wall-display"].computer_id,
+  }, "display.update", protocol.object({ token = "t-local" }))
+  assertTrue(localReply ~= nil and localReply.payload ~= nil, "local delivery still works")
+  assertEqual(get(localReply.payload, "answered_by"), "wall-display", "from the right Computer")
+
+  -- Scenario 6: Home to Farm, all the way around the Central Server.
+  local remoteReply = world:ask("alex-pc", {
+    customer_network_id = "network-farm",
+    computer_id = world.bindings["harvester"].computer_id,
+  }, "harvester.status", protocol.object({ token = "t-remote" }))
+  assertTrue(remoteReply ~= nil and remoteReply.payload ~= nil, "cross-network traffic still works")
+  assertEqual(get(remoteReply.payload, "answered_by"), "harvester", "from the right Computer")
+end)
+
+test("an external call fails with gateway_unavailable and changes nothing", function()
+  local world = fullWorld()
+  local before = world.central:state().revision
+
+  local outcome = world.central.runtime:submit({
+    kind = "external_request",
+    operation = "test.identity",
+    customer_network_id = "network-farm",
+    computer_id = world.bindings["harvester"].computer_id,
+    local_address = "192.168.1.20",
+    access_token = "opaque.bearer.token",
+    request_id = "req-external-1",
+  })
+
+  -- The engine accepted it and asked for a Gateway; the runtime reported that
+  -- there is none, and that came back as the stable code.
+  assertEqual(world.central.runtime.lastError.code, "gateway_unavailable",
+    "the failure reached the runtime")
+  assertTrue(outcome.result.ok, "the engine did its part")
+  assertEqual(world.central:state().revision, before,
+    "and nothing durable moved because the External Application was away")
+end)
+
+test("the Central Server stamps the ancestry from what it knows", function()
+  local world = fullWorld()
+  local sent
+  -- Stand in for a Gateway so the body it would have sent can be read.
+  world.central.runtime.adapters.gateway = {
+    send = function(_, kind, body) sent = { kind = kind, body = body } return true end,
+  }
+
+  world.central.runtime:submit({
+    kind = "external_request",
+    operation = "test.identity",
+    customer_network_id = "network-farm",
+    computer_id = world.bindings["harvester"].computer_id,
+    local_address = "192.168.1.20",
+    access_token = "opaque.bearer.token",
+  })
+
+  assertTrue(sent ~= nil, "the Gateway was handed a message")
+  assertEqual(sent.kind, "external_request", "kind")
+  local ancestry = get(sent.body, "ancestry")
+  assertEqual(get(ancestry, "world_id"), "world-overworld", "World")
+  assertEqual(get(ancestry, "isp_id"), "isp-acme", "the ISP that owns the route")
+  assertEqual(get(ancestry, "router_id"), "router-farm", "and its Customer Router")
+  assertEqual(get(ancestry, "customer_network_id"), "network-farm", "network")
+end)
+
+test("a disabled Customer Network cannot reach the External Application either", function()
+  local world = fullWorld()
+  world.central.runtime.adapters.gateway = {
+    send = function() return true end,
+  }
+  assertTrue(world.central:setNetworkStatus("network-farm", "disabled", "cmd-x"), "disabled")
+
+  local outcome = world.central.runtime:submit({
+    kind = "external_request",
+    operation = "test.identity",
+    customer_network_id = "network-farm",
+    computer_id = world.bindings["harvester"].computer_id,
+    local_address = "192.168.1.20",
+    access_token = "opaque.bearer.token",
+  })
+  assertTrue(not outcome.result.ok, "the call was refused")
+  assertEqual(outcome.result.code, "network_disabled", "code")
+end)
