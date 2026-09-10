@@ -1,0 +1,12 @@
+{
+  "name": "craftnet-runtime",
+  "version": "0.1.0",
+  "dependencies": {
+    "craftnet-core": "^0.1.0",
+    "craftnet-protocol": "^0.1.0"
+  },
+  "files": {
+    "init.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/files/init.lua"
+  }
+}
+

@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: external/go.mod
+          cache-dependency-path: external/go.mod
+
+      - name: Install Lua 5.2
+        run: sudo apt-get update && sudo apt-get install --yes lua5.2
+
+      - name: Check formatting
+        run: bash scripts/check-format.sh
+
+      - name: Run Milestone 0 gate
+        env:
+          LUA_BIN: lua5.2
+          CRAFTNET_TEST_SEED: "12648430"
+        run: bash scripts/test-all.sh
+

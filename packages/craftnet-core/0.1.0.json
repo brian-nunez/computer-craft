@@ -1,0 +1,9 @@
+{
+  "name": "craftnet-core",
+  "version": "0.1.0",
+  "dependencies": {},
+  "files": {
+    "init.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-core/files/init.lua"
+  }
+}
+

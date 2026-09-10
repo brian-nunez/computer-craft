@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "minecraft": "1.21.11",
+  "mod_loader": "Fabric",
+  "cc_tweaked": "1.117.1",
+  "go": "1.27.0",
+  "craftnet_wire": 1
+}
+

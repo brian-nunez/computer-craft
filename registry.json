@@ -14,6 +14,27 @@
           "manifest": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/networking/1.0.0.json"
         }
       }
+    },
+    "craftnet-protocol": {
+      "versions": {
+        "0.1.0": {
+          "manifest": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/0.1.0.json"
+        }
+      }
+    },
+    "craftnet-core": {
+      "versions": {
+        "0.1.0": {
+          "manifest": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-core/0.1.0.json"
+        }
+      }
+    },
+    "craftnet-runtime": {
+      "versions": {
+        "0.1.0": {
+          "manifest": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/0.1.0.json"
+        }
+      }
     }
   }
 }
