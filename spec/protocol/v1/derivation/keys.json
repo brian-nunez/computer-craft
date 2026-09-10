@@ -1,0 +1,64 @@
+{
+  "enrollment_secret": {
+    "child_role": "isp",
+    "token_use_counter": 7,
+    "value": "44c1377fb68255093adf95bef4173abb4fce113a22b6c9e7cb036bfa87b71c5d"
+  },
+  "labels": {
+    "enrollment": "craftnet/v1/enrollment\u000a",
+    "nonce": "craftnet/v1/nonce\u000a",
+    "relationship": "craftnet/v1/relationship\u000a",
+    "session": "craftnet/v1/session\u000a"
+  },
+  "nonces": [
+    {
+      "generation": 1,
+      "role": "isp",
+      "value": "5c341542365d986e7eeefc1f254844dd61a0b93e85ed4c5b90e3edca837372f9"
+    },
+    {
+      "generation": 1,
+      "role": "central",
+      "value": "96139f0a55b903b8dc00d2135c24ea9118a1e6530a9d5cbb9fed0d8d4658177a"
+    }
+  ],
+  "note": "Every value is derived, not stored. Labels are purpose separated so that one credential can never stand in for another.",
+  "re_enrollment_credential": {
+    "transcript": {
+      "child_id": "isp-acme",
+      "client_nonce": "11111111111111111111111111111111111111111111111111111111aaaaaaaa",
+      "parent_id": "central-overworld",
+      "parent_nonce": "22222222222222222222222222222222222222222222222222222222bbbbbbbb",
+      "parent_revision": 12,
+      "relationship_id": "rel-acme-0001",
+      "requested_name": "acme",
+      "role": "isp"
+    },
+    "value": "bd216249359c34de8ffe265c81d3143853045f32a3243c9442e8e06005ec2ecc"
+  },
+  "relationship_credential": {
+    "transcript": {
+      "client_nonce": "11111111111111111111111111111111111111111111111111111111aaaaaaaa",
+      "parent_id": "central-overworld",
+      "parent_nonce": "22222222222222222222222222222222222222222222222222222222bbbbbbbb",
+      "parent_revision": 12,
+      "relationship_id": "rel-acme-0001",
+      "requested_name": "acme",
+      "role": "isp"
+    },
+    "value": "394387a176be8c655d5d13fc62bdeddabaab530a393e46443f808fa3db7f921e"
+  },
+  "root_secret_hex": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
+  "schema": 1,
+  "session_key": {
+    "transcript": {
+      "child_revision": 3,
+      "client_nonce": "33333333333333333333333333333333333333333333333333333333cccccccc",
+      "parent_nonce": "44444444444444444444444444444444444444444444444444444444dddddddd",
+      "parent_revision": 12,
+      "relationship_id": "rel-acme-0001",
+      "session_id": "ses-000042"
+    },
+    "value": "909893b23941c6d2f58fb0efdbbb04aeb91af8488809992df4bc77915e07853f"
+  }
+}

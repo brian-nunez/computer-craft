@@ -1,0 +1,55 @@
+{
+  "cases": [
+    {
+      "name": "counters must strictly increase",
+      "steps": [
+        {
+          "counter": 1,
+          "expect": "accepted",
+          "text": "{\"body\":{\"connectivity_state\":\"connecting\",\"revision\":1},\"body_hash\":\"d1995a6eb3a78258f6865209c94b48e4ea667895934ba6489440f8fba8fe0381\",\"counter\":1,\"kind\":\"heartbeat\",\"mac\":\"30533941ba899a40c5e30e93d8eb8ff55e7dcd30463fe90a25dc53b12312c9a1\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+        },
+        {
+          "counter": 2,
+          "expect": "accepted",
+          "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":2},\"body_hash\":\"f387b463ff3b03121c8c833d4df612bd80fcaf4058685e8518c82abb61e1b637\",\"counter\":2,\"kind\":\"heartbeat\",\"mac\":\"b7d5030c49387f37d540a3c0072104a831b0131d3f1f0f1b7ae2b15ba94f9144\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+        },
+        {
+          "expect": "replay_rejected",
+          "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":2},\"body_hash\":\"f387b463ff3b03121c8c833d4df612bd80fcaf4058685e8518c82abb61e1b637\",\"counter\":2,\"kind\":\"heartbeat\",\"mac\":\"b7d5030c49387f37d540a3c0072104a831b0131d3f1f0f1b7ae2b15ba94f9144\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+        },
+        {
+          "expect": "replay_rejected",
+          "text": "{\"body\":{\"connectivity_state\":\"connecting\",\"revision\":1},\"body_hash\":\"d1995a6eb3a78258f6865209c94b48e4ea667895934ba6489440f8fba8fe0381\",\"counter\":1,\"kind\":\"heartbeat\",\"mac\":\"30533941ba899a40c5e30e93d8eb8ff55e7dcd30463fe90a25dc53b12312c9a1\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+        },
+        {
+          "counter": 3,
+          "expect": "accepted",
+          "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":3},\"body_hash\":\"46d6019d6cd46d7326ee1dc4a68846118d87fc6f036c6add488de9f95ec3524a\",\"counter\":3,\"kind\":\"heartbeat\",\"mac\":\"88fbc3a2dd222f0f77fcfcc808a50ea8a048da7bfdd689df5b448e4ef80a39ee\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+        }
+      ]
+    },
+    {
+      "name": "a skipped counter is accepted but never revisited",
+      "steps": [
+        {
+          "counter": 3,
+          "expect": "accepted",
+          "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":3},\"body_hash\":\"46d6019d6cd46d7326ee1dc4a68846118d87fc6f036c6add488de9f95ec3524a\",\"counter\":3,\"kind\":\"heartbeat\",\"mac\":\"88fbc3a2dd222f0f77fcfcc808a50ea8a048da7bfdd689df5b448e4ef80a39ee\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+        },
+        {
+          "expect": "replay_rejected",
+          "text": "{\"body\":{\"connectivity_state\":\"connecting\",\"revision\":1},\"body_hash\":\"d1995a6eb3a78258f6865209c94b48e4ea667895934ba6489440f8fba8fe0381\",\"counter\":1,\"kind\":\"heartbeat\",\"mac\":\"30533941ba899a40c5e30e93d8eb8ff55e7dcd30463fe90a25dc53b12312c9a1\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+        },
+        {
+          "expect": "replay_rejected",
+          "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":2},\"body_hash\":\"f387b463ff3b03121c8c833d4df612bd80fcaf4058685e8518c82abb61e1b637\",\"counter\":2,\"kind\":\"heartbeat\",\"mac\":\"b7d5030c49387f37d540a3c0072104a831b0131d3f1f0f1b7ae2b15ba94f9144\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+        }
+      ]
+    }
+  ],
+  "note": "Replay each sequence against one fresh session, in order.",
+  "relationship_id": "rel-farm-0007",
+  "schema": 1,
+  "session_id": "ses-000042",
+  "session_key_hex": "5f4dcc3b5aa765d61d8327deb882cf995f4dcc3b5aa765d61d8327deb882cf99"
+}

@@ -51,6 +51,7 @@ func Validate(repositoryRoot string) error {
 	}
 
 	listedManifests := make(map[string]struct{})
+	listedSources := make(map[string]struct{})
 	for packageName, packageEntry := range index.Packages {
 		if !safeSegment(packageName) {
 			return fmt.Errorf("unsafe package name %q", packageName)
@@ -98,7 +99,34 @@ func Validate(repositoryRoot string) error {
 				if err != nil || !info.Mode().IsRegular() {
 					return fmt.Errorf("%s source file %q is unavailable", packageName+"@"+version, relativeSource)
 				}
+				listedSources[relativeSource] = struct{}{}
 			}
+		}
+	}
+
+	// Every source file on disk must be listed by some version of its package.
+	// Without this check a new module could ship in the repository and simply
+	// never reach a Computer, failing at require time rather than at install.
+	sourcePattern := filepath.Join(repositoryRoot, "packages", "*", "files", "*")
+	localSources, err := filepath.Glob(sourcePattern)
+	if err != nil {
+		return fmt.Errorf("find package sources: %w", err)
+	}
+	for _, localSource := range localSources {
+		info, err := os.Stat(localSource)
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			continue
+		}
+		relative, err := filepath.Rel(repositoryRoot, localSource)
+		if err != nil {
+			return err
+		}
+		relative = filepath.ToSlash(relative)
+		if _, listed := listedSources[relative]; !listed {
+			return fmt.Errorf("package source %q is not listed in any manifest", relative)
 		}
 	}
 

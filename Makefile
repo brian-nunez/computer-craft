@@ -1,6 +1,6 @@
-.PHONY: test test-lua test-go test-fixtures test-catalog fmt-check
+.PHONY: test test-lua test-go test-fixtures test-catalog check-fixtures fixtures fmt-check
 
-test: test-lua test-fixtures test-catalog test-go
+test: test-lua test-fixtures test-catalog check-fixtures test-go
 
 test-lua:
 	bash scripts/test-lua.sh
@@ -10,6 +10,12 @@ test-fixtures:
 
 test-catalog:
 	bash scripts/test-catalog.sh
+
+check-fixtures:
+	bash scripts/check-fixtures.sh
+
+fixtures:
+	bash scripts/generate-fixtures.sh
 
 test-go:
 	bash scripts/test-go.sh

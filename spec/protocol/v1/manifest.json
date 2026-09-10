@@ -1,6 +1,148 @@
 {
+  "fixtures": [
+    {
+      "consumers": [
+        "lua",
+        "go"
+      ],
+      "expect": "valid",
+      "kind": "cj1",
+      "path": "cj1/canonical.json"
+    },
+    {
+      "consumers": [
+        "lua",
+        "go"
+      ],
+      "expect": "invalid",
+      "kind": "cj1",
+      "path": "cj1/rejected.json"
+    },
+    {
+      "consumers": [
+        "lua",
+        "go"
+      ],
+      "expect": "valid",
+      "kind": "key_derivation",
+      "path": "derivation/keys.json"
+    },
+    {
+      "consumers": [
+        "lua",
+        "go"
+      ],
+      "expect": "valid",
+      "kind": "error_catalog",
+      "path": "errors/catalog.json"
+    },
+    {
+      "consumers": [
+        "lua",
+        "go"
+      ],
+      "expect": "valid",
+      "kind": "frame",
+      "path": "frames/accepted.json"
+    },
+    {
+      "consumers": [
+        "lua",
+        "go"
+      ],
+      "expect": "invalid",
+      "kind": "frame",
+      "path": "frames/rejected.json"
+    },
+    {
+      "consumers": [
+        "lua",
+        "go"
+      ],
+      "expect": "invalid",
+      "kind": "frame_sequence",
+      "path": "frames/sequences.json"
+    },
+    {
+      "consumers": [
+        "go"
+      ],
+      "expect": "valid",
+      "kind": "gateway_frame",
+      "path": "gateway/frames.json"
+    },
+    {
+      "consumers": [
+        "lua",
+        "go"
+      ],
+      "expect": "valid",
+      "kind": "enrollment",
+      "path": "handshake/enrollment.json"
+    },
+    {
+      "consumers": [
+        "lua",
+        "go"
+      ],
+      "expect": "valid",
+      "kind": "session",
+      "path": "handshake/session.json"
+    },
+    {
+      "consumers": [
+        "lua",
+        "go"
+      ],
+      "expect": "valid",
+      "kind": "hmac_sha256",
+      "path": "hash/hmac-sha256.json"
+    },
+    {
+      "consumers": [
+        "lua",
+        "go"
+      ],
+      "expect": "valid",
+      "kind": "sha256",
+      "path": "hash/sha256.json"
+    },
+    {
+      "consumers": [
+        "lua",
+        "go"
+      ],
+      "expect": "invalid",
+      "kind": "limits",
+      "path": "limits/edges.json"
+    },
+    {
+      "consumers": [
+        "lua",
+        "go"
+      ],
+      "expect": "valid",
+      "kind": "message",
+      "path": "messages/accepted.json"
+    },
+    {
+      "consumers": [
+        "lua",
+        "go"
+      ],
+      "expect": "invalid",
+      "kind": "message",
+      "path": "messages/rejected.json"
+    },
+    {
+      "consumers": [
+        "go"
+      ],
+      "expect": "valid",
+      "kind": "access_token",
+      "path": "tokens/access-token.json"
+    }
+  ],
   "schema": 1,
-  "wire_version": 1,
-  "fixtures": []
+  "wire_version": 1
 }
-

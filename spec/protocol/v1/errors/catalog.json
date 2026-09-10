@@ -1,0 +1,121 @@
+{
+  "codes": [
+    {
+      "code": "invalid_message",
+      "meaning": "JSON, type, required-field, or canonical-form validation failed",
+      "retryable": false
+    },
+    {
+      "code": "unsupported_version",
+      "meaning": "Peer does not implement the requested major version",
+      "retryable": false
+    },
+    {
+      "code": "message_too_large",
+      "meaning": "Frame, payload, snapshot, or batch exceeds a limit",
+      "retryable": false
+    },
+    {
+      "code": "busy",
+      "meaning": "Bounded in-flight capacity is exhausted",
+      "retryable": true
+    },
+    {
+      "code": "authentication_failed",
+      "meaning": "Enrollment, session, Gateway, or device proof failed",
+      "retryable": false
+    },
+    {
+      "code": "replay_rejected",
+      "meaning": "Session ID, nonce, request, or counter was reused or out of order",
+      "retryable": false
+    },
+    {
+      "code": "credential_revoked",
+      "meaning": "Durable relationship, device, or Gateway credential is revoked",
+      "retryable": false
+    },
+    {
+      "code": "access_token_expired",
+      "meaning": "The two-minute Access Token is expired",
+      "retryable": true
+    },
+    {
+      "code": "forbidden_operation",
+      "meaning": "Credential is valid but does not authorize the operation",
+      "retryable": false
+    },
+    {
+      "code": "name_not_found",
+      "meaning": "DNS name has no authoritative record",
+      "retryable": false
+    },
+    {
+      "code": "name_conflict",
+      "meaning": "Requested ISP, network, or hostname already exists in its scope",
+      "retryable": false
+    },
+    {
+      "code": "pool_exhausted",
+      "meaning": "No Customer or Provider Address is available",
+      "retryable": false
+    },
+    {
+      "code": "address_conflict",
+      "meaning": "Address is already bound in the relevant scope",
+      "retryable": false
+    },
+    {
+      "code": "router_unavailable",
+      "meaning": "Destination or local Customer Router is disconnected",
+      "retryable": true
+    },
+    {
+      "code": "upstream_unavailable",
+      "meaning": "Immediate parent relationship is unavailable",
+      "retryable": true
+    },
+    {
+      "code": "route_not_found",
+      "meaning": "Central route map has no destination Customer Network",
+      "retryable": false
+    },
+    {
+      "code": "inbound_denied",
+      "meaning": "No matching Exposed Service permits a new remote request",
+      "retryable": false
+    },
+    {
+      "code": "nat_flow_missing",
+      "meaning": "Reply refers to an expired or unknown NAT Flow",
+      "retryable": false
+    },
+    {
+      "code": "network_disabled",
+      "meaning": "Central Network Status disables the Customer Network",
+      "retryable": false
+    },
+    {
+      "code": "gateway_unavailable",
+      "meaning": "Central Server lacks a ready Gateway Session",
+      "retryable": true
+    },
+    {
+      "code": "request_timeout",
+      "meaning": "No terminal response arrived before the operation deadline",
+      "retryable": true
+    },
+    {
+      "code": "revision_conflict",
+      "meaning": "Command or update was based on stale authoritative state",
+      "retryable": true
+    },
+    {
+      "code": "internal_error",
+      "meaning": "An unexpected owner-side failure occurred without exposing internals",
+      "retryable": true
+    }
+  ],
+  "note": "Codes are wire constants. Retryable describes whether a fresh attempt could succeed; it never authorizes automatic replay.",
+  "schema": 1
+}

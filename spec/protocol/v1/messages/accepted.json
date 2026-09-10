@@ -1,0 +1,228 @@
+{
+  "cases": [
+    {
+      "body": "{\"client_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\",\"role\":\"computer\"}",
+      "kind": "discover",
+      "name": "discover",
+      "transport": "discovery"
+    },
+    {
+      "body": "{\"client_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\",\"discovery_channel\":65000,\"display_name\":\"Farm Router\",\"parent_id\":\"rtr-farm\",\"parent_role\":\"router\"}",
+      "kind": "offer",
+      "name": "offer",
+      "transport": "discovery"
+    },
+    {
+      "body": "{\"client_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\",\"requested_name\":\"harvester\",\"role\":\"computer\"}",
+      "kind": "enroll_open",
+      "name": "enroll_open first join",
+      "transport": "handshake"
+    },
+    {
+      "body": "{\"client_id\":\"cmp-harvester\",\"client_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\",\"requested_name\":\"harvester\",\"role\":\"computer\"}",
+      "kind": "enroll_open",
+      "name": "enroll_open re-enrollment",
+      "transport": "handshake"
+    },
+    {
+      "body": "{\"client_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\",\"parent_id\":\"rtr-farm\",\"parent_nonce\":\"22222222222222222222222222222222222222222222222222222222bbbbbbbb\",\"parent_revision\":4,\"relationship_id\":\"rel-farm-0007\"}",
+      "kind": "enroll_challenge",
+      "name": "enroll_challenge",
+      "transport": "handshake"
+    },
+    {
+      "body": "{\"child_revision\":0,\"client_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\",\"parent_nonce\":\"22222222222222222222222222222222222222222222222222222222bbbbbbbb\",\"relationship_id\":\"rel-farm-0007\"}",
+      "kind": "enroll_confirm",
+      "name": "enroll_confirm",
+      "transport": "handshake"
+    },
+    {
+      "body": "{\"child_id\":\"cmp-harvester\",\"configuration\":{\"address\":\"192.168.1.20\",\"computer_id\":\"cmp-harvester\",\"customer_network_id\":\"net-farm\",\"dns_address\":\"192.168.1.1\",\"hostname\":\"harvester\",\"router_address\":\"192.168.1.1\"},\"operational_channel\":3100,\"parent_revision\":4,\"relationship_id\":\"rel-farm-0007\"}",
+      "kind": "enroll_accept",
+      "name": "enroll_accept",
+      "transport": "handshake"
+    },
+    {
+      "body": "{\"code\":\"name_conflict\",\"message\":\"That hostname is already taken on this network.\",\"retryable\":false}",
+      "kind": "enroll_error",
+      "name": "enroll_error",
+      "transport": "handshake"
+    },
+    {
+      "body": "{\"child_revision\":3,\"client_nonce\":\"33333333333333333333333333333333333333333333333333333333cccccccc\",\"relationship_id\":\"rel-farm-0007\"}",
+      "kind": "session_open",
+      "name": "session_open",
+      "transport": "handshake"
+    },
+    {
+      "body": "{\"client_nonce\":\"33333333333333333333333333333333333333333333333333333333cccccccc\",\"parent_nonce\":\"44444444444444444444444444444444444444444444444444444444dddddddd\",\"parent_revision\":4,\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\"}",
+      "kind": "session_challenge",
+      "name": "session_challenge",
+      "transport": "handshake"
+    },
+    {
+      "body": "{\"client_nonce\":\"33333333333333333333333333333333333333333333333333333333cccccccc\",\"parent_nonce\":\"44444444444444444444444444444444444444444444444444444444dddddddd\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\"}",
+      "kind": "session_confirm",
+      "name": "session_confirm",
+      "transport": "handshake"
+    },
+    {
+      "body": "{\"connectivity_state\":\"ready\",\"revision\":4}",
+      "kind": "heartbeat",
+      "name": "heartbeat",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"acked_request_id\":\"req-104\"}",
+      "kind": "ack",
+      "name": "ack without a revision",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"acked_request_id\":\"req-104\",\"result_revision\":5}",
+      "kind": "ack",
+      "name": "ack with a revision",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"known_revision\":0}",
+      "kind": "config_request",
+      "name": "config_request",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"configuration\":{\"bindings\":[{\"address\":\"192.168.1.20\",\"computer_id\":\"cmp-harvester\",\"hostname\":\"harvester\"}],\"customer_network_id\":\"net-farm\",\"customer_network_name\":\"farm\",\"dns_address\":\"192.168.1.1\",\"isp_id\":\"isp-acme\",\"lan_operational_channel\":3100,\"pool_first\":\"192.168.1.20\",\"pool_last\":\"192.168.1.200\",\"provider_address\":\"100.64.7.9\",\"router_address\":\"192.168.1.1\"},\"revision\":4,\"role\":\"router\"}",
+      "kind": "config_snapshot",
+      "name": "config_snapshot for a router",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"configuration\":{\"isp_id\":\"isp-acme\",\"isp_name\":\"acme\",\"operational_channel\":2100,\"provider_allocations\":[{\"first\":\"100.64.0.0\",\"last\":\"100.64.255.255\"}]},\"revision\":9,\"role\":\"isp\"}",
+      "kind": "config_snapshot",
+      "name": "config_snapshot for an isp",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"configuration\":{\"central_id\":\"central-overworld\",\"gateway_credential_ref\":\"gwc-0001\",\"gateway_url\":\"wss://craftnet.example/gateway\",\"provider_allocations\":[{\"first\":\"100.64.0.0\",\"last\":\"100.127.255.255\"}],\"world_id\":\"world-overworld\"},\"revision\":2,\"role\":\"central\"}",
+      "kind": "config_snapshot",
+      "name": "config_snapshot for central",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"name\":\"harvester.farm.acme.craft\"}",
+      "kind": "dns_query",
+      "name": "dns_query",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"address\":\"192.168.1.20\",\"canonical_name\":\"harvester.farm.acme.craft\",\"computer_id\":\"cmp-harvester\",\"customer_network_id\":\"net-farm\"}",
+      "kind": "dns_result",
+      "name": "dns_result",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"customer_network_id\":\"net-farm\",\"customer_network_name\":\"farm\",\"isp_id\":\"isp-acme\",\"revision\":11,\"router_id\":\"rtr-farm\",\"router_provider_address\":\"100.64.7.9\"}",
+      "kind": "route_register",
+      "name": "route_register",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"customer_network_id\":\"net-farm\",\"revision\":12}",
+      "kind": "route_remove",
+      "name": "route_remove",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"destination\":{\"computer_id\":\"cmp-kitchen\",\"customer_network_id\":\"net-home\"},\"payload\":{\"slot\":3,\"unknown_application_field\":true},\"service\":\"inventory.read\",\"source\":{\"computer_id\":\"cmp-harvester\",\"customer_network_id\":\"net-farm\",\"local_address\":\"192.168.1.20\"}}",
+      "kind": "service_request",
+      "name": "service_request to a hostname",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"destination\":{\"address\":\"192.168.1.21\",\"customer_network_id\":\"net-home\"},\"destination_flow_id\":\"flow-b2\",\"payload\":{},\"service\":\"inventory.read\",\"source\":{\"computer_id\":\"cmp-harvester\",\"customer_network_id\":\"net-farm\",\"local_address\":\"192.168.1.20\"},\"source_flow_id\":\"flow-a1\"}",
+      "kind": "service_request",
+      "name": "service_request to an address with flows",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"payload\":{\"items\":[]},\"source_flow_id\":\"flow-a1\"}",
+      "kind": "service_response",
+      "name": "service_response",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"code\":\"route_not_found\",\"details\":{\"customer_network_id\":\"net-home\"},\"message\":\"That network is not reachable right now.\",\"retryable\":false}",
+      "kind": "error",
+      "name": "error with details",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"computers\":[{\"computer_id\":\"cmp-harvester\",\"customer_network_id\":\"net-farm\"}],\"isps\":[{\"display_name\":\"Acme\",\"isp_id\":\"isp-acme\"}],\"network_statuses\":[{\"customer_network_id\":\"net-farm\",\"status\":\"enabled\"}],\"revision\":31,\"routers\":[{\"isp_id\":\"isp-acme\",\"router_id\":\"rtr-farm\"}],\"world\":{\"display_name\":\"Overworld\",\"world_id\":\"world-overworld\"}}",
+      "kind": "topology_snapshot",
+      "name": "topology_snapshot",
+      "transport": "gateway"
+    },
+    {
+      "body": "{\"change\":\"added\",\"entity\":{\"computer_id\":\"cmp-silo\",\"customer_network_id\":\"net-farm\"},\"entity_type\":\"computer\",\"revision\":32}",
+      "kind": "topology_change",
+      "name": "topology_change",
+      "transport": "gateway"
+    },
+    {
+      "body": "{\"events\":[{\"bytes\":240,\"computer_id\":\"cmp-harvester\",\"customer_network_id\":\"net-farm\",\"direction\":\"outbound\",\"event_id\":\"evt-880\",\"kind\":\"service_request\",\"observed_at_ms\":1024000,\"outcome\":\"delivered\",\"world_id\":\"world-overworld\"},{\"bytes\":0,\"direction\":\"inbound\",\"event_id\":\"evt-881\",\"kind\":\"service_response\",\"observed_at_ms\":1024500,\"outcome\":\"request_timeout\",\"request_id\":\"req-104\",\"world_id\":\"world-overworld\"}],\"first_sequence\":880,\"last_sequence\":881}",
+      "kind": "traffic_batch",
+      "name": "traffic_batch",
+      "transport": "gateway"
+    },
+    {
+      "body": "{\"command_id\":\"cmd-0009\",\"customer_network_id\":\"net-farm\",\"status\":\"disabled\"}",
+      "kind": "network_status_set",
+      "name": "network_status_set",
+      "transport": "operational"
+    },
+    {
+      "body": "{\"command_id\":\"cmd-0009\",\"revision\":33,\"status\":\"applied\"}",
+      "kind": "command_result",
+      "name": "command_result applied",
+      "transport": "gateway"
+    },
+    {
+      "body": "{\"command_id\":\"cmd-0010\",\"error\":{\"code\":\"revision_conflict\",\"message\":\"The dashboard was showing an older state.\",\"retryable\":true},\"revision\":33,\"status\":\"rejected\"}",
+      "kind": "command_result",
+      "name": "command_result rejected",
+      "transport": "gateway"
+    },
+    {
+      "body": "{\"access_token\":\"opaque.bearer.token\",\"ancestry\":{\"computer_id\":\"cmp-harvester\",\"customer_network_id\":\"net-farm\",\"isp_id\":\"isp-acme\",\"local_address\":\"192.168.1.20\",\"router_id\":\"rtr-farm\",\"world_id\":\"world-overworld\"},\"operation\":\"market.quote\",\"payload\":{\"symbol\":\"wheat\"},\"source_flow_id\":\"flow-a1\"}",
+      "kind": "external_request",
+      "name": "external_request for an ordinary operation",
+      "transport": "gateway"
+    },
+    {
+      "body": "{\"ancestry\":{\"computer_id\":\"cmp-harvester\",\"customer_network_id\":\"net-farm\",\"isp_id\":\"isp-acme\",\"local_address\":\"192.168.1.20\",\"router_id\":\"rtr-farm\",\"world_id\":\"world-overworld\"},\"operation\":\"device.register\",\"payload\":{},\"registration_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\",\"source_flow_id\":\"flow-a2\"}",
+      "kind": "external_request",
+      "name": "external_request registering a device",
+      "transport": "gateway"
+    },
+    {
+      "body": "{\"ancestry\":{\"computer_id\":\"cmp-harvester\",\"customer_network_id\":\"net-farm\",\"isp_id\":\"isp-acme\",\"local_address\":\"192.168.1.20\",\"router_id\":\"rtr-farm\",\"world_id\":\"world-overworld\"},\"device_credential\":\"opaque-device-credential\",\"operation\":\"token.issue\",\"payload\":{},\"source_flow_id\":\"flow-a3\"}",
+      "kind": "external_request",
+      "name": "external_request issuing a token",
+      "transport": "gateway"
+    },
+    {
+      "body": "{\"payload\":{\"currency\":\"emerald\",\"price\":19}}",
+      "kind": "external_response",
+      "name": "external_response",
+      "transport": "gateway"
+    },
+    {
+      "body": "{\"action\":\"set_network_status\",\"customer_network_id\":\"net-farm\",\"status\":\"enabled\"}",
+      "kind": "admin_command",
+      "name": "admin_command",
+      "transport": "gateway"
+    }
+  ],
+  "note": "Decode body, validate it against kind, and confirm transport carries kind. Every case must be accepted.",
+  "schema": 1
+}

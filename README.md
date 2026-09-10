@@ -5,9 +5,10 @@ model one Central Server, multiple ISPs, Customer Routers, and Computers, while
 the Go External Application provides the controlled WebSocket gateway and
 operator dashboard.
 
-Implementation Milestone 0 is complete: the reproducible test, fixture, package,
-and application skeleton is present. CraftNet networking behavior intentionally
-begins in Milestone 1. The complete design and delivery gates are indexed in
+Implementation Milestone 1 is complete: the CraftNet v1 wire and its
+authentication exist in both languages, checked against one shared fixture
+catalog. Role behavior — addressing, DNS, routing, NAT — intentionally begins in
+Milestone 2. The complete design and delivery gates are indexed in
 [the CraftNet v1 map](.scratch/craftnet-v1/map.md), and completed-gate evidence
 is recorded under [`docs/implementation/`](docs/implementation/).
 
@@ -27,7 +28,7 @@ local feedback.
 
 ## Development commands
 
-Run the complete Milestone 0 gate from the repository root:
+Run the complete Milestone 1 gate from the repository root:
 
 ```bash
 make test
@@ -40,15 +41,19 @@ The individual checks are:
 bash scripts/test-lua.sh
 bash scripts/test-fixtures.sh
 bash scripts/test-catalog.sh
+bash scripts/check-fixtures.sh
 bash scripts/test-go.sh
 ```
 
 `test-go.sh` runs `go test -race ./...` inside `external/`. The fixture command
 validates [`spec/protocol/v1/manifest.json`](spec/protocol/v1/manifest.json),
-including safe paths, listed JSON files, schema version, and wire version. Its Go
-tests deliberately supply malformed and unlisted fixtures to verify rejection.
-The catalog check verifies that every `registry.json` entry agrees with its local
-manifest, dependency names, source files, and immutable GitHub URL.
+including safe paths, listed JSON files, schema version, wire version, and the
+implementations that must replay each fixture. Its Go tests deliberately supply
+malformed and unlisted fixtures to verify rejection. The catalog check verifies
+that every `registry.json` entry agrees with its local manifest, dependency
+names, source files, and immutable GitHub URL, and that no package source ships
+without being listed. `check-fixtures.sh` regenerates the protocol catalog and
+diffs it, so the generator can never drift away from the checked-in fixtures.
 
 Tests default to deterministic seed `12648430` (`0xC0FFEE`). Reproduce another
 seed with:
@@ -57,25 +62,78 @@ seed with:
 CRAFTNET_TEST_SEED=42 make test
 ```
 
+Lua 5.2 supplies `bit32`, which is the path CC:Tweaked takes. Newer interpreters
+removed it, so running the suite under both covers each half of
+`packages/craftnet-protocol/files/bitops.lua`:
+
+```bash
+LUA_BIN=lua5.2 bash scripts/test-lua.sh
+LUA_BIN=lua5.4 bash scripts/test-lua.sh
+```
+
 Lua and Go temporary-state helpers create isolated data beneath operating-system
 temporary directories. Local credentials, databases, runtime data, build output,
 and coverage output are excluded by `.gitignore`; tests must never write them
 into the repository.
 
+## The protocol catalog
+
+[`spec/protocol/v1/`](spec/protocol/v1/) is the executable compatibility source
+of truth: canonical-JSON goldens, published SHA-256 and HMAC vectors, the key
+derivation chain, one body per message kind, authenticated frames, tampering and
+replay sequences, limit edges, and the stable error catalog. Lua and Go both
+replay it and must classify every case identically.
+
+It is generated, not hand-edited. After changing the generator:
+
+```bash
+make fixtures
+```
+
+## Provisioning a development World
+
+The External Application owns the root secrets. Generate a development World Key
+and Gateway Credential before running any CraftOS role, so that nothing in world
+invents a root secret or reuses a fixture credential:
+
+```bash
+cd external && go run ./cmd/craftnetprov -out ../data/world.json
+```
+
+The bundle is written with owner-only permissions and is never overwritten in
+place. `data/` is already excluded by `.gitignore`.
+
 ## Repository layout
 
 ```text
-external/                 Go module and craftnetd composition root
+external/                 Go module, craftnetd, and the protocol implementation
 packages/                 ccpm Lua packages and immutable manifests
 spec/protocol/v1/         cross-language protocol fixture catalog
-tests/lua/                portable Lua test runner and test support
+tests/lua/                portable Lua test runner, support, and suites
 scripts/                  local and CI entry points
+docs/adr/                 accepted architecture decisions
+docs/implementation/      completed-milestone gate evidence
 .scratch/craftnet-v1/     resolved design and delivery tickets
 ```
 
-The initial `craftnet-protocol`, `craftnet-core`, and `craftnet-runtime` packages
-contain version metadata only. Their protocol, authority, and orchestration
-implementations begin in Milestones 1, 2, and 3 respectively.
+`craftnet-protocol` implements the v1 wire: canonical JSON, SHA-256 and HMAC in
+pure Lua, key derivation, strict schemas, the session handshake, counters and
+replay rejection, framing, correlation, size limits, and timeouts. A caller opens
+an enrolled link and exchanges semantic messages; it never calculates a MAC or a
+canonical form.
+
+```lua
+local protocol = dofile("/.ccpm/packages/craftnet-protocol/0.1.0/init.lua")
+
+-- `session` comes from the enrollment or reconnect handshake; `transport` and
+-- `clock` are supplied by craftnet-runtime in Milestone 3.
+local link = protocol.open({ session = session, transport = transport, clock = clock })
+local result, code = link:request("dns_query",
+  protocol.object({ name = "harvester.farm.acme.craft" }))
+```
+
+`craftnet-core` and `craftnet-runtime` still contain version metadata only. Their
+authority and orchestration implementations begin in Milestones 2 and 3.
 
 ## ccpm
 
@@ -97,6 +155,7 @@ wget https://raw.githubusercontent.com/brian-nunez/computer-craft/main/ccpm.lua 
 ```text
 ccpm install networking
 ccpm install peripheral-discovery ^1.0.0
+ccpm install craftnet-protocol ^0.1.0
 ccpm install craftnet-runtime ^0.1.0
 ccpm list
 ```

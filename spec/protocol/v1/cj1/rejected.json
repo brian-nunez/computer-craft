@@ -1,0 +1,116 @@
+{
+  "cases": [
+    {
+      "error": "invalid_message",
+      "name": "duplicate key",
+      "text": "{\"a\":1,\"a\":2}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "duplicate key hidden behind an escape",
+      "text": "{\"\\u0061\":1,\"a\":2}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "fractional number",
+      "text": "{\"n\":1.5}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "exponent number",
+      "text": "{\"n\":1e3}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "integer above the exact range",
+      "text": "{\"n\":9007199254740992}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "integer below the exact range",
+      "text": "{\"n\":-9007199254740992}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "leading zero",
+      "text": "{\"n\":01}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "sparse array",
+      "text": "[1,,2]"
+    },
+    {
+      "error": "invalid_message",
+      "name": "trailing comma in an array",
+      "text": "[1,2,]"
+    },
+    {
+      "error": "invalid_message",
+      "name": "trailing comma in an object",
+      "text": "{\"a\":1,}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "unquoted key",
+      "text": "{a:1}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "single quoted key",
+      "text": "{'a':1}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "unescaped control character",
+      "text": "{\"s\":\"a\u0009b\"}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "lone high surrogate",
+      "text": "{\"s\":\"\\ud83d\"}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "lone low surrogate",
+      "text": "{\"s\":\"\\ude00\"}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "unknown escape",
+      "text": "{\"s\":\"\\x41\"}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "trailing data",
+      "text": "{\"a\":1} {\"b\":2}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "empty input",
+      "text": ""
+    },
+    {
+      "error": "invalid_message",
+      "name": "bare identifier",
+      "text": "undefined"
+    },
+    {
+      "error": "invalid_message",
+      "name": "unterminated object",
+      "text": "{\"a\":1"
+    },
+    {
+      "error": "invalid_message",
+      "name": "unterminated string",
+      "text": "{\"a\":\"b"
+    },
+    {
+      "error": "message_too_large",
+      "name": "nesting one past the depth limit",
+      "text": "[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]"
+    }
+  ],
+  "note": "Each text must be rejected with exactly this catalog code.",
+  "schema": 1
+}

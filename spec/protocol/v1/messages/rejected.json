@@ -1,0 +1,168 @@
+{
+  "cases": [
+    {
+      "body": "{}",
+      "error": "invalid_message",
+      "kind": "not_a_kind",
+      "name": "unknown kind"
+    },
+    {
+      "body": "{\"connectivity_state\":\"ready\"}",
+      "error": "invalid_message",
+      "kind": "heartbeat",
+      "name": "missing required field"
+    },
+    {
+      "body": "{\"connectivity_state\":\"ready\",\"revision\":1,\"extra\":true}",
+      "error": "invalid_message",
+      "kind": "heartbeat",
+      "name": "unknown field"
+    },
+    {
+      "body": "{\"acked_request_id\":\"req-1\",\"result_revision\":null}",
+      "error": "invalid_message",
+      "kind": "ack",
+      "name": "optional field encoded as an empty substitute"
+    },
+    {
+      "body": "{\"connectivity_state\":\"online\",\"revision\":1}",
+      "error": "invalid_message",
+      "kind": "heartbeat",
+      "name": "enum outside the set"
+    },
+    {
+      "body": "{\"connectivity_state\":\"ready\",\"revision\":-1}",
+      "error": "invalid_message",
+      "kind": "heartbeat",
+      "name": "revision must not be negative"
+    },
+    {
+      "body": "{\"acked_request_id\":\"Req-1\"}",
+      "error": "invalid_message",
+      "kind": "ack",
+      "name": "identifier with an uppercase letter"
+    },
+    {
+      "body": "{\"acked_request_id\":\"-req\"}",
+      "error": "invalid_message",
+      "kind": "ack",
+      "name": "identifier starting with a hyphen"
+    },
+    {
+      "body": "{\"acked_request_id\":\"\"}",
+      "error": "invalid_message",
+      "kind": "ack",
+      "name": "identifier that is empty"
+    },
+    {
+      "body": "{\"role\":\"computer\",\"client_nonce\":\"aabb\"}",
+      "error": "invalid_message",
+      "kind": "discover",
+      "name": "nonce that is too short"
+    },
+    {
+      "body": "{\"role\":\"computer\",\"client_nonce\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"}",
+      "error": "invalid_message",
+      "kind": "discover",
+      "name": "nonce in uppercase hex"
+    },
+    {
+      "body": "{\"role\":\"gateway\",\"client_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\"}",
+      "error": "invalid_message",
+      "kind": "discover",
+      "name": "role outside the set"
+    },
+    {
+      "body": "{\"parent_id\":\"rtr-farm\",\"parent_role\":\"router\",\"display_name\":\"Farm\",\"discovery_channel\":70000,\"client_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\"}",
+      "error": "invalid_message",
+      "kind": "offer",
+      "name": "channel above the modem range"
+    },
+    {
+      "body": "{\"canonical_name\":\"h.farm.acme.craft\",\"customer_network_id\":\"net-farm\",\"computer_id\":\"cmp-h\",\"address\":\"8.8.8.8\"}",
+      "error": "invalid_message",
+      "kind": "dns_result",
+      "name": "customer address outside rfc 1918"
+    },
+    {
+      "body": "{\"customer_network_id\":\"net-farm\",\"customer_network_name\":\"farm\",\"router_id\":\"rtr-farm\",\"router_provider_address\":\"10.0.0.1\",\"isp_id\":\"isp-acme\",\"revision\":1}",
+      "error": "invalid_message",
+      "kind": "route_register",
+      "name": "provider address outside rfc 6598"
+    },
+    {
+      "body": "{\"role\":\"computer\",\"requested_name\":\"harvester-\",\"client_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\"}",
+      "error": "invalid_message",
+      "kind": "enroll_open",
+      "name": "normalized name ending in a hyphen"
+    },
+    {
+      "body": "{\"role\":\"computer\",\"requested_name\":\"Harvester\",\"client_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\"}",
+      "error": "invalid_message",
+      "kind": "enroll_open",
+      "name": "normalized name with an uppercase letter"
+    },
+    {
+      "body": "{\"source\":{\"computer_id\":\"cmp-h\",\"customer_network_id\":\"net-farm\",\"local_address\":\"192.168.1.20\"},\"destination\":{\"customer_network_id\":\"net-home\"},\"service\":\"s.read\",\"payload\":{}}",
+      "error": "invalid_message",
+      "kind": "service_request",
+      "name": "destination naming neither computer nor address"
+    },
+    {
+      "body": "{\"source\":{\"computer_id\":\"cmp-h\",\"customer_network_id\":\"net-farm\",\"local_address\":\"192.168.1.20\"},\"destination\":{\"customer_network_id\":\"net-home\",\"computer_id\":\"cmp-k\",\"address\":\"192.168.1.21\"},\"service\":\"s.read\",\"payload\":{}}",
+      "error": "invalid_message",
+      "kind": "service_request",
+      "name": "destination naming both computer and address"
+    },
+    {
+      "body": "{\"revision\":1,\"role\":\"isp\",\"configuration\":{\"computer_id\":\"cmp-h\",\"hostname\":\"h\",\"address\":\"192.168.1.20\",\"customer_network_id\":\"net-farm\",\"router_address\":\"192.168.1.1\",\"dns_address\":\"192.168.1.1\"}}",
+      "error": "invalid_message",
+      "kind": "config_snapshot",
+      "name": "configuration that does not match its role"
+    },
+    {
+      "body": "{\"first_sequence\":1,\"last_sequence\":5,\"events\":[{\"event_id\":\"evt-1\",\"observed_at_ms\":0,\"world_id\":\"world-o\",\"direction\":\"local\",\"kind\":\"heartbeat\",\"outcome\":\"delivered\",\"bytes\":0}]}",
+      "error": "invalid_message",
+      "kind": "traffic_batch",
+      "name": "traffic batch whose range disagrees with its events"
+    },
+    {
+      "body": "{\"first_sequence\":1,\"last_sequence\":1,\"events\":[{\"event_id\":\"evt-1\",\"observed_at_ms\":0,\"world_id\":\"world-o\",\"direction\":\"local\",\"kind\":\"heartbeat\",\"outcome\":\"delivered\",\"bytes\":0,\"payload\":{\"secret\":\"value\"}}]}",
+      "error": "invalid_message",
+      "kind": "traffic_batch",
+      "name": "traffic event carrying a payload"
+    },
+    {
+      "body": "{\"action\":\"delete_world\",\"customer_network_id\":\"net-farm\",\"status\":\"enabled\"}",
+      "error": "invalid_message",
+      "kind": "admin_command",
+      "name": "admin command outside the v1 allowlist"
+    },
+    {
+      "body": "{\"ancestry\":{\"world_id\":\"world-o\",\"isp_id\":\"isp-a\",\"customer_network_id\":\"net-farm\",\"router_id\":\"rtr-farm\",\"computer_id\":\"cmp-h\",\"local_address\":\"192.168.1.20\"},\"source_flow_id\":\"flow-a\",\"operation\":\"device.register\",\"registration_nonce\":\"11111111111111111111111111111111111111111111111111111111aaaaaaaa\",\"access_token\":\"t\",\"payload\":{}}",
+      "error": "invalid_message",
+      "kind": "external_request",
+      "name": "device registration also presenting a token"
+    },
+    {
+      "body": "{\"ancestry\":{\"world_id\":\"world-o\",\"isp_id\":\"isp-a\",\"customer_network_id\":\"net-farm\",\"router_id\":\"rtr-farm\",\"computer_id\":\"cmp-h\",\"local_address\":\"192.168.1.20\"},\"source_flow_id\":\"flow-a\",\"operation\":\"market.quote\",\"device_credential\":\"c\",\"payload\":{}}",
+      "error": "invalid_message",
+      "kind": "external_request",
+      "name": "ordinary operation presenting a device credential"
+    },
+    {
+      "body": "[]",
+      "error": "invalid_message",
+      "kind": "heartbeat",
+      "name": "body that is an array"
+    },
+    {
+      "body": "\"ready\"",
+      "error": "invalid_message",
+      "kind": "heartbeat",
+      "name": "body that is a string"
+    }
+  ],
+  "note": "Decode body and validate it against kind. Every case must fail with this code.",
+  "schema": 1
+}

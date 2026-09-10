@@ -44,3 +44,36 @@ func writeTestFile(t *testing.T, root, name, contents string) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 }
+
+func TestValidateRejectsAFixtureWithNoConsumer(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, manifestName,
+		`{"schema":1,"wire_version":1,"fixtures":[{"path":"a.json","kind":"cj1","expect":"valid","consumers":[]}]}`)
+	writeTestFile(t, root, "a.json", `{}`)
+	err := Validate(root)
+	if err == nil || !strings.Contains(err.Error(), "consumers") {
+		t.Fatalf("Validate() error = %v, want missing consumer failure", err)
+	}
+}
+
+func TestValidateRejectsAnUnknownConsumer(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, manifestName,
+		`{"schema":1,"wire_version":1,"fixtures":[{"path":"a.json","kind":"cj1","expect":"valid","consumers":["rust"]}]}`)
+	writeTestFile(t, root, "a.json", `{}`)
+	err := Validate(root)
+	if err == nil || !strings.Contains(err.Error(), "not a CraftNet implementation") {
+		t.Fatalf("Validate() error = %v, want unknown consumer failure", err)
+	}
+}
+
+func TestValidateRejectsAFixtureThatIsNotJSON(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, manifestName,
+		`{"schema":1,"wire_version":1,"fixtures":[{"path":"a.json","kind":"cj1","expect":"valid","consumers":["go"]}]}`)
+	writeTestFile(t, root, "a.json", `{"unterminated":`)
+	err := Validate(root)
+	if err == nil || !strings.Contains(err.Error(), "not valid JSON") {
+		t.Fatalf("Validate() error = %v, want malformed fixture failure", err)
+	}
+}

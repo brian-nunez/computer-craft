@@ -1,0 +1,74 @@
+{
+  "cases": [
+    {
+      "error": "invalid_message",
+      "name": "a changed body field no longer matches its body hash",
+      "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":9},\"body_hash\":\"c3ae55991ef691b0f4cfe2cc0386b0bc439b3cf1740c29e87918b318d67985fb\",\"counter\":1,\"kind\":\"heartbeat\",\"mac\":\"41e25dd19577d7c6d7098450b75df01e681dc4b0397231d064363d6fa8f848e6\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+    },
+    {
+      "error": "authentication_failed",
+      "name": "a changed body with a recomputed hash fails the mac",
+      "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":9},\"body_hash\":\"2ef27f7c840c5668533600c67f939b7bc68f9eed37c93e334900a06652d609e9\",\"counter\":1,\"kind\":\"heartbeat\",\"mac\":\"41e25dd19577d7c6d7098450b75df01e681dc4b0397231d064363d6fa8f848e6\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+    },
+    {
+      "error": "authentication_failed",
+      "name": "a changed counter fails the mac",
+      "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":4},\"body_hash\":\"c3ae55991ef691b0f4cfe2cc0386b0bc439b3cf1740c29e87918b318d67985fb\",\"counter\":2,\"kind\":\"heartbeat\",\"mac\":\"41e25dd19577d7c6d7098450b75df01e681dc4b0397231d064363d6fa8f848e6\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+    },
+    {
+      "error": "authentication_failed",
+      "name": "a changed request id fails the mac",
+      "text": "{\"body\":{\"name\":\"harvester.farm.acme.craft\"},\"body_hash\":\"aa6db7cfca7d4ca8ddcadacc6484e22161a0fdda254684463b001e433608b343\",\"counter\":1,\"kind\":\"dns_query\",\"mac\":\"a7753e65b5fa15d1b0925797a928f2f94f3b0078f24270f63e0772e320f8bb3f\",\"relationship_id\":\"rel-farm-0007\",\"request_id\":\"req-105\",\"session_id\":\"ses-000042\",\"v\":1}"
+    },
+    {
+      "error": "authentication_failed",
+      "name": "a dropped request id fails the mac",
+      "text": "{\"body\":{\"name\":\"harvester.farm.acme.craft\"},\"body_hash\":\"aa6db7cfca7d4ca8ddcadacc6484e22161a0fdda254684463b001e433608b343\",\"counter\":1,\"kind\":\"dns_query\",\"mac\":\"a7753e65b5fa15d1b0925797a928f2f94f3b0078f24270f63e0772e320f8bb3f\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+    },
+    {
+      "error": "authentication_failed",
+      "name": "a frame naming another relationship is refused",
+      "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":4},\"body_hash\":\"c3ae55991ef691b0f4cfe2cc0386b0bc439b3cf1740c29e87918b318d67985fb\",\"counter\":1,\"kind\":\"heartbeat\",\"mac\":\"41e25dd19577d7c6d7098450b75df01e681dc4b0397231d064363d6fa8f848e6\",\"relationship_id\":\"rel-other-0001\",\"session_id\":\"ses-000042\",\"v\":1}"
+    },
+    {
+      "error": "authentication_failed",
+      "name": "a frame naming another session is refused",
+      "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":4},\"body_hash\":\"c3ae55991ef691b0f4cfe2cc0386b0bc439b3cf1740c29e87918b318d67985fb\",\"counter\":1,\"kind\":\"heartbeat\",\"mac\":\"41e25dd19577d7c6d7098450b75df01e681dc4b0397231d064363d6fa8f848e6\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000043\",\"v\":1}"
+    },
+    {
+      "error": "authentication_failed",
+      "name": "a corrupted mac is refused",
+      "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":4},\"body_hash\":\"c3ae55991ef691b0f4cfe2cc0386b0bc439b3cf1740c29e87918b318d67985fb\",\"counter\":1,\"kind\":\"heartbeat\",\"mac\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+    },
+    {
+      "error": "unsupported_version",
+      "name": "a future major version is refused",
+      "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":4},\"body_hash\":\"c3ae55991ef691b0f4cfe2cc0386b0bc439b3cf1740c29e87918b318d67985fb\",\"counter\":1,\"kind\":\"heartbeat\",\"mac\":\"41e25dd19577d7c6d7098450b75df01e681dc4b0397231d064363d6fa8f848e6\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":2}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "an unknown control field is refused",
+      "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":4},\"body_hash\":\"c3ae55991ef691b0f4cfe2cc0386b0bc439b3cf1740c29e87918b318d67985fb\",\"counter\":1,\"kind\":\"heartbeat\",\"mac\":\"41e25dd19577d7c6d7098450b75df01e681dc4b0397231d064363d6fa8f848e6\",\"priority\":\"high\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "a missing mac is refused",
+      "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":4},\"body_hash\":\"c3ae55991ef691b0f4cfe2cc0386b0bc439b3cf1740c29e87918b318d67985fb\",\"counter\":1,\"kind\":\"heartbeat\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "a counter of zero is refused before authentication",
+      "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":4},\"body_hash\":\"c3ae55991ef691b0f4cfe2cc0386b0bc439b3cf1740c29e87918b318d67985fb\",\"counter\":0,\"kind\":\"heartbeat\",\"mac\":\"41e25dd19577d7c6d7098450b75df01e681dc4b0397231d064363d6fa8f848e6\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+    },
+    {
+      "error": "invalid_message",
+      "name": "a handshake kind is not carried by the operational transport",
+      "text": "{\"body\":{\"connectivity_state\":\"ready\",\"revision\":4},\"body_hash\":\"c3ae55991ef691b0f4cfe2cc0386b0bc439b3cf1740c29e87918b318d67985fb\",\"counter\":1,\"kind\":\"session_open\",\"mac\":\"41e25dd19577d7c6d7098450b75df01e681dc4b0397231d064363d6fa8f848e6\",\"relationship_id\":\"rel-farm-0007\",\"session_id\":\"ses-000042\",\"v\":1}"
+    }
+  ],
+  "note": "Open each text with a fresh session. Every case must fail with this code.",
+  "relationship_id": "rel-farm-0007",
+  "schema": 1,
+  "session_id": "ses-000042",
+  "session_key_hex": "5f4dcc3b5aa765d61d8327deb882cf995f4dcc3b5aa765d61d8327deb882cf99"
+}
