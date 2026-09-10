@@ -397,6 +397,178 @@ test("scenario 7: an administrative command is idempotent by Command ID", functi
 end)
 
 --------------------------------------------------------------------------
+-- Scenario 8 -- use the External Application
+--------------------------------------------------------------------------
+
+-- The Central Server is the only role that holds a Gateway Session, so in the
+-- simulator its `gateway` effect is where the World ends. What is being checked
+-- here is everything up to that point, and everything back from it.
+
+local function gatewayEffects(sim, nodeName)
+  local found = {}
+  for _, effect in ipairs(sim:node(nodeName).outbox) do
+    if effect.kind == "gateway" then found[#found + 1] = effect end
+  end
+  return found
+end
+
+local function callExternal(sim, from, fields)
+  local input = { kind = "external_call", operation = fields.operation or "test.identity" }
+  for key, value in pairs(fields) do input[key] = value end
+  input.kind = "external_call"
+  sim:input(from, input)
+  return gatewayEffects(sim, "central")
+end
+
+test("scenario 8: an external call travels the whole ancestry and the answer comes home", function()
+  local sim = build()
+
+  local sent = callExternal(sim, "alex-pc", {
+    operation = "test.identity", access_token = "opaque.bearer.token",
+  })
+
+  -- Computer to router to ISP to Central Server. No Customer Network is named
+  -- anywhere on the way: the kind is the destination.
+  --
+  -- alex-pc leads the path because a Computer's own initiating input carries
+  -- the same name as the message it produces, unlike local_request.
+  local path = sim:path("external_call")
+  local expected = { "alex-pc", "router-home", "acme", "central" }
+  assertEqual(#path, #expected, "hop count")
+  for index = 1, #expected do
+    assertEqual(path[index], expected[index], "hop " .. index)
+  end
+
+  assertEqual(#sent, 1, "the Central Server put exactly one request on the Gateway")
+  assertEqual(sent[1].message_kind, "external_request", "and it is a Gateway kind")
+
+  -- The External Application answers, and the reply retraces the NAT Flow the
+  -- source Customer Router opened.
+  sim:input("central", {
+    kind = "gateway_frame", frame_kind = "external_response",
+    request_id = sent[1].request_id,
+    body = core.object({ payload = core.object({ verified = "yes" }) }),
+  })
+  sim:drain()
+
+  local answer = sim:lastResultAt("alex-pc", "service_response")
+  assertTrue(answer and answer.ok, "the reply arrived at the Computer that asked")
+  assertEqual(get(answer.payload, "verified"), "yes", "carrying what the application answered")
+  assertEqual(#sim:resultsAt("wall-display", "service_response"), 0, "and nowhere else")
+  assertEqual(sim:engine("router-home").flows:size(), 0, "the flow closed")
+end)
+
+test("scenario 8: the ancestry is stamped from the route directory, never from the caller", function()
+  local sim = build()
+
+  local sent = callExternal(sim, "harvester", {
+    operation = "test.identity", access_token = "opaque.bearer.token",
+  })
+  assertEqual(#sent, 1, "one request reached the Gateway")
+
+  local ancestry = get(sent[1].body, "ancestry")
+  assertEqual(get(ancestry, "world_id"), sim:state("central").world_id, "World")
+  assertEqual(get(ancestry, "isp_id"), "isp-acme", "the ISP that owns the route")
+  assertEqual(get(ancestry, "customer_network_id"), "network-farm", "the Customer Network")
+  assertEqual(get(ancestry, "router_id"), "router-farm", "its Customer Router")
+  assertEqual(get(ancestry, "computer_id"), "computer-farm-harvester", "the Computer")
+  assertEqual(get(ancestry, "local_address"), "192.168.1.20", "and the address it holds")
+
+  -- Farm's 192.168.1.20, not Home's. The ancestry is what tells them apart.
+  assertTrue(get(sent[1].body, "source_flow_id") ~= nil,
+    "the call was NATted, so a reply can find its way back")
+end)
+
+test("scenario 8: each operation may present only the credential it is allowed", function()
+  local sim = build()
+
+  -- device.register offers the verified ancestry and nothing else.
+  local registering = sim:input("alex-pc", {
+    kind = "external_call", operation = "device.register",
+    registration_nonce = string.rep("cc", 32),
+  })
+  assertTrue(registering.result.ok, "registering with a nonce alone is allowed")
+
+  -- The same call carrying a token as well is refused before it leaves.
+  local both = sim:input("alex-pc", {
+    kind = "external_call", operation = "device.register",
+    registration_nonce = string.rep("cc", 32), access_token = "opaque.bearer.token",
+  })
+  assertTrue(not both.result.ok, "a device registration may not also present a token")
+  assertEqual(both.result.code, "invalid_message", "code")
+
+  -- And an ordinary operation with no token at all is refused too.
+  local naked = sim:input("alex-pc", { kind = "external_call", operation = "test.identity" })
+  assertTrue(not naked.result.ok, "an ordinary operation needs its Access Token")
+  assertEqual(naked.result.code, "invalid_message", "code")
+end)
+
+test("scenario 8: the External Application does not call into a Customer Network", function()
+  local sim = build()
+
+  -- An external_call arriving from upstream is not a call to serve. Both the
+  -- ISP and the Customer Router refuse one, so there is no path inward.
+  local atRouter = sim:input("router-home", {
+    kind = "message",
+    relationship_id = "rel-acme-home",
+    message = {
+      kind = "external_call", request_id = "req-inbound",
+      body = core.object({
+        source = core.object({
+          computer_id = "computer-home-alex", customer_network_id = "network-home",
+          local_address = "192.168.1.20",
+        }),
+        operation = "test.identity", access_token = "t", payload = core.object(),
+      }),
+    },
+  })
+  assertTrue(not atRouter.result.ok, "the router refused it")
+  assertEqual(atRouter.result.code, "inbound_denied", "code")
+end)
+
+test("scenario 8: a disabled Customer Network cannot reach the External Application", function()
+  local sim = build()
+  reference.assertOk(sim:input("central", {
+    kind = "set_network_status", customer_network_id = "network-farm",
+    status = "disabled", command_id = "cmd-external-1",
+  }), "disable farm")
+
+  local before = #gatewayEffects(sim, "central")
+  sim:input("harvester", {
+    kind = "external_call", operation = "test.identity", access_token = "opaque.bearer.token",
+  })
+  sim:drain()
+
+  assertEqual(#gatewayEffects(sim, "central"), before,
+    "nothing reached the Gateway")
+  local answer = sim:lastResultAt("harvester", "error")
+  assertTrue(answer ~= nil, "and the Computer was told why")
+end)
+
+test("scenario 8: a Gateway that could not carry the call answers the Computer", function()
+  local sim = build()
+
+  local sent = callExternal(sim, "alex-pc", {
+    operation = "test.identity", access_token = "opaque.bearer.token",
+  })
+  assertEqual(#sent, 1, "the request was handed to the Gateway")
+
+  -- This is what the runtime reports when there is no Gateway Session. Without
+  -- it the Computer would wait out its timeout instead of being told.
+  sim:input("central", {
+    kind = "effect_result", effect = "gateway", ok = false,
+    request_id = sent[1].request_id,
+    code = "gateway_unavailable", message = "this role has no Gateway Session",
+  })
+  sim:drain()
+
+  local answer = sim:lastResultAt("alex-pc", "error")
+  assertTrue(answer ~= nil, "the failure reached the Computer that asked")
+  assertEqual(answer.code, "gateway_unavailable", "as its stable code")
+  assertEqual(sim:engine("router-home").flows:size(), 0, "and the flow was released")
+end)
+
+--------------------------------------------------------------------------
 -- Scenario 10 -- administration arriving over the Gateway
 --------------------------------------------------------------------------
 

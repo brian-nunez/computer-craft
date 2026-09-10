@@ -65,6 +65,7 @@
     },
     {
       "consumers": [
+        "lua",
         "go"
       ],
       "expect": "valid",

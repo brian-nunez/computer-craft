@@ -11,6 +11,7 @@ local cj1 = protocol.conformance.cj1
 local keys = protocol.conformance.keys
 local frame = protocol.conformance.frame
 local schema = protocol.conformance.schema
+local gateway = protocol.gateway
 local sha256 = protocol.conformance.sha256
 local hmac = protocol.conformance.hmac
 local limits = protocol.limits
@@ -176,6 +177,79 @@ test("every rejected message fixture fails with its exact code", function()
       assertEqual(code, field(item, "error"), name)
     end
   end
+end)
+
+--------------------------------------------------------------------------
+-- The Gateway
+--------------------------------------------------------------------------
+
+-- The Gateway is the one CraftNet link with an implementation at each end of a
+-- single socket: Lua opens it, Go answers. Replaying these vectors here is what
+-- makes that agreement checked rather than assumed.
+
+test("the Gateway hello re-encodes byte for byte", function()
+  local document = catalog.load("gateway/frames.json")
+  local text = field(document, "hello")
+  local decoded = assert(cj1.decode(text), "the hello fixture did not decode")
+
+  local encoded, code, detail = gateway.encodeHello({
+    world_id = field(decoded, "world_id"),
+    central_id = field(decoded, "central_id"),
+    last_topology_revision = field(decoded, "last_topology_revision"),
+    last_traffic_sequence = field(decoded, "last_traffic_sequence"),
+  })
+  assertTrue(encoded ~= nil, tostring(code) .. " " .. tostring(detail))
+  assertEqual(encoded, text, "Lua and Go must produce the same hello bytes")
+end)
+
+test("the Gateway welcome decodes into the session it opens", function()
+  local document = catalog.load("gateway/frames.json")
+  local welcome, code, detail = gateway.decodeWelcome(field(document, "welcome"))
+  assertTrue(welcome ~= nil, tostring(code) .. " " .. tostring(detail))
+  assertEqual(welcome.gateway_session_id, "gws-000003", "session id")
+  assertEqual(welcome.accepted_topology_revision, 31, "topology revision")
+  assertEqual(welcome.accepted_traffic_sequence, 879, "traffic sequence")
+  assertEqual(welcome.server_time, "2026-09-09T12:00:00Z", "server time")
+end)
+
+test("every accepted Gateway frame decodes and re-encodes byte for byte", function()
+  local document = catalog.load("gateway/frames.json")
+  for item in each(document, "frames") do
+    local name = field(item, "name")
+    local text = field(item, "text")
+
+    local decoded, code, detail = gateway.decodeFrame(text)
+    assertTrue(decoded ~= nil, name .. ": " .. tostring(code) .. " " .. tostring(detail))
+    assertEqual(decoded.kind, field(item, "kind"), name .. " kind")
+    assertEqual(decoded.request_id, rawget(item, "request_id"), name .. " request_id")
+    assertEqual(decoded.command_id, rawget(item, "command_id"), name .. " command_id")
+
+    -- Round-tripping is the stronger claim: the body survived the decoder
+    -- intact and the canonical form agrees with the one Go wrote.
+    local encoded = assert(gateway.encodeFrame(decoded.kind, decoded.body, {
+      request_id = decoded.request_id, command_id = decoded.command_id,
+    }), name .. ": did not re-encode")
+    assertEqual(encoded, text, name .. ": Lua and Go disagree about the bytes")
+  end
+end)
+
+test("every rejected Gateway frame fails with its exact code", function()
+  local document = catalog.load("gateway/frames.json")
+  for item in each(document, "rejected") do
+    local name = field(item, "name")
+    local decoded, code = gateway.decodeFrame(field(item, "text"))
+    assertTrue(decoded == nil, name .. ": frame was accepted")
+    assertEqual(code, field(item, "error"), name)
+  end
+end)
+
+test("the Gateway refuses to send a kind it does not carry", function()
+  -- The transport is checked before anything is encoded, so an operational-only
+  -- kind never reaches the socket to be refused at the far end.
+  local text, code = gateway.encodeFrame("dns_query",
+    protocol.object({ name = "harvester.farm.acme.craft" }))
+  assertTrue(text == nil, "dns_query must not travel on the Gateway")
+  assertEqual(code, "invalid_message", "code")
 end)
 
 --------------------------------------------------------------------------

@@ -9,9 +9,11 @@ import (
 	"github.com/brian-nunez/computer-craft/external/internal/protocol"
 )
 
-// writeGatewayFrames records the Gateway handshake and frame shapes. CraftOS
-// never speaks WebSocket -- only the Central Server's Go counterpart does -- so
-// these are consumed by Go alone.
+// writeGatewayFrames records the Gateway handshake and frame shapes. Both
+// implementations replay them: since Milestone 9 the Central Server holds the
+// socket from inside CraftOS, so Lua encodes the hello and decodes everything
+// that comes back, and the two ends of one WebSocket are held to one set of
+// vectors rather than to each other by inspection.
 func writeGatewayFrames() {
 	hello, err := protocol.EncodeGatewayHello(protocol.GatewayHello{
 		WorldID: "world-overworld", CentralID: "central-overworld",
@@ -53,8 +55,18 @@ func writeGatewayFrames() {
 	if err != nil {
 		fail(err)
 	}
+	// The answer travels the other way: this is what the Central Server decodes
+	// and hands back to the Computer that asked, correlated by request_id.
+	externalResponse, err := protocol.EncodeGatewayFrame(protocol.GatewayFrame{
+		Kind:      "external_response",
+		RequestID: "req-104",
+		Body:      protocol.Object{"payload": protocol.Object{"price": int64(19), "currency": "emerald"}},
+	})
+	if err != nil {
+		fail(err)
+	}
 
-	record("gateway/frames.json", "gateway_frame", "valid", goOnly(), protocol.Object{
+	record("gateway/frames.json", "gateway_frame", "valid", both(), protocol.Object{
 		"schema": int64(1),
 		"note": "The Gateway relies on WSS plus the authenticated Gateway Session rather than a " +
 			"second message HMAC, so these frames carry no proof.",
@@ -66,6 +78,8 @@ func writeGatewayFrames() {
 				"request_id": "req-104", "text": externalRequest},
 			protocol.Object{"name": "admin_command", "kind": "admin_command",
 				"command_id": "cmd-0009", "text": adminCommand},
+			protocol.Object{"name": "external_response", "kind": "external_response",
+				"request_id": "req-104", "text": externalResponse},
 		},
 		"rejected": protocol.Array{
 			protocol.Object{"name": "an operational-only kind is not carried by the Gateway",

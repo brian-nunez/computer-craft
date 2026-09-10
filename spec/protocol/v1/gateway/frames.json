@@ -12,6 +12,12 @@
       "kind": "admin_command",
       "name": "admin_command",
       "text": "{\"body\":{\"action\":\"set_network_status\",\"customer_network_id\":\"net-farm\",\"status\":\"disabled\"},\"command_id\":\"cmd-0009\",\"kind\":\"admin_command\",\"v\":1}"
+    },
+    {
+      "kind": "external_response",
+      "name": "external_response",
+      "request_id": "req-104",
+      "text": "{\"body\":{\"payload\":{\"currency\":\"emerald\",\"price\":19}},\"kind\":\"external_response\",\"request_id\":\"req-104\",\"v\":1}"
     }
   ],
   "hello": "{\"central_id\":\"central-overworld\",\"last_topology_revision\":31,\"last_traffic_sequence\":879,\"v\":1,\"world_id\":\"world-overworld\"}",

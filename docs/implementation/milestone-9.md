@@ -142,11 +142,57 @@ leaks out of the protocol package to get it.
 
 ## Gate evidence
 
-`make fmt-check` and `make test`: **253 Lua tests, 0 failures**, the fixture
+`make fmt-check` and `make test`: **294 Lua tests, 0 failures**, the fixture
 catalog valid and regenerating to no diff, and the Go suite under `-race` at two
 seeds.
 
-Three existing tests changed, each because this milestone changed what is true:
+The milestone first landed at 253, with its behaviour proved by hand rather than
+by a suite. The 41 tests that closed that are listed below; each was checked by
+breaking the code it defends and watching it fail.
+
+### What the new tests hold
+
+**The wire, in both languages.** `gateway/frames.json` was Go-only, so the Lua
+Gateway codec added here was checked against Go's only by inspection. It now
+lists both: Lua encodes the hello and must produce the bytes Go wrote, decodes
+the welcome and every frame, and **re-encodes each one back to the byte**. The
+fixture gained an `external_response`, which is the frame the Lua side actually
+decodes in production and which nothing had covered.
+
+**The transport** — `tests/lua/runtime_gateway_test.lua`, twenty cases driving
+the real adapter over a scripted `http`. The credential travels as hex in the
+Authorization header; a socket that never answers and a welcome that does not
+decode are both *not* sessions and both close the socket; a kind the Gateway
+does not carry is refused before it leaves and the session survives it; a bad
+frame is dropped and a good one still arrives after it; an event belonging to a
+modem or another socket is left alone; a close arms backoff, backoff grows and
+stops growing at the ceiling, and an idle session heartbeats while a busy one
+does not.
+
+**The path** — scenario 8 in `core_scenarios_test.lua` and
+`role_internet_test.lua`. The call travels Computer to router to ISP to Central
+Server and the answer retraces its NAT Flow to the one Computer that asked;
+the ancestry is stamped from the route directory; each operation presents only
+the credential it is allowed; an `external_call` from upstream is
+`inbound_denied`; a disabled network never reaches the Gateway; and a Gateway
+send that could not leave **answers** the Computer rather than leaving it to
+time out.
+
+Over the real packages, a Computer registers, buys a token, calls
+`test.identity`, and gets its verified path back — three Gateway requests the
+first time and **one** the second, because the token is held until nearly spent.
+Its Device Credential and Access Token appear nowhere in its snapshot. And with
+the application stopped, the external call fails `gateway_unavailable` while
+cross-network traffic carries on.
+
+**What the Central Server reports.** Topology goes first and once per session,
+not once per tick; Traffic Events batch with strictly increasing durable
+sequences that match their event counts; and a canary that exists only inside a
+payload is searched for in every field of every event it publishes.
+
+### Existing tests that changed
+
+Three, each because this milestone changed what is true:
 
 | Test | Was | Is |
 |---|---|---|
