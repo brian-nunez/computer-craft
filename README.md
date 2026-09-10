@@ -5,10 +5,12 @@ model one Central Server, multiple ISPs, Customer Routers, and Computers, while
 the Go External Application provides the controlled WebSocket gateway and
 operator dashboard.
 
-Implementation Milestone 1 is complete: the CraftNet v1 wire and its
-authentication exist in both languages, checked against one shared fixture
-catalog. Role behavior — addressing, DNS, routing, NAT — intentionally begins in
-Milestone 2. The complete design and delivery gates are indexed in
+Implementation Milestone 2 is complete: the v1 wire and its authentication exist
+in both languages, and `craftnet-core` now decides what CraftNet does —
+addressing, DNS, exact routing, NAT, exposure policy, and Network Status — as
+pure state transitions with no Minecraft involved. Running those decisions on a
+real Computer intentionally begins in Milestone 3. The complete design and
+delivery gates are indexed in
 [the CraftNet v1 map](.scratch/craftnet-v1/map.md), and completed-gate evidence
 is recorded under [`docs/implementation/`](docs/implementation/).
 
@@ -28,7 +30,7 @@ local feedback.
 
 ## Development commands
 
-Run the complete Milestone 1 gate from the repository root:
+Run the complete Milestone 2 gate from the repository root:
 
 ```bash
 make test
@@ -90,6 +92,28 @@ It is generated, not hand-edited. After changing the generator:
 make fixtures
 ```
 
+## The role engine
+
+[`packages/craftnet-core/`](packages/craftnet-core/) holds every CraftNet
+decision behind one seam:
+
+```lua
+local engine = core.newEngine({ role = "router", state = durableState })
+local outcome = engine:handle(input, now)
+-- outcome = { state_changes, effects, result, revision }
+```
+
+An effect is a description, not an action: the runtime performs it and reports
+back by feeding the answer in as the next input. Nothing in the package touches
+a peripheral, a file, a timer, or a socket, which is what lets the whole of
+CraftNet's behavior be tested without Minecraft.
+
+`tests/lua/support/simulator.lua` runs many engines against a fake clock and a
+message queue, and `tests/lua/support/reference.lua` stands up the canonical
+Home and Farm topology through real state transitions — no address, route, or
+binding is written by hand. The acceptance scenarios run against it in
+[`tests/lua/core_scenarios_test.lua`](tests/lua/core_scenarios_test.lua).
+
 ## Provisioning a development World
 
 The External Application owns the root secrets. Generate a development World Key
@@ -132,8 +156,18 @@ local result, code = link:request("dns_query",
   protocol.object({ name = "harvester.farm.acme.craft" }))
 ```
 
-`craftnet-core` and `craftnet-runtime` still contain version metadata only. Their
-authority and orchestration implementations begin in Milestones 2 and 3.
+`craftnet-core` turns validated input into state changes and effects for the
+Central Server, ISP, Customer Router, and Computer roles. It is pure: a
+composition root injects the protocol package with `core.withProtocol()`, and
+the engine performs no I/O of its own.
+
+```lua
+local core = dofile("/.ccpm/packages/craftnet-core/0.1.0/init.lua").withProtocol(protocol)
+local engine = core.newEngine({ role = "router", state = saved })
+```
+
+`craftnet-runtime` still contains version metadata only. Its CraftOS event loop,
+modem adapter, and durable snapshots begin in Milestone 3.
 
 ## ccpm
 
@@ -156,6 +190,7 @@ wget https://raw.githubusercontent.com/brian-nunez/computer-craft/main/ccpm.lua 
 ccpm install networking
 ccpm install peripheral-discovery ^1.0.0
 ccpm install craftnet-protocol ^0.1.0
+ccpm install craftnet-core ^0.1.0
 ccpm install craftnet-runtime ^0.1.0
 ccpm list
 ```
