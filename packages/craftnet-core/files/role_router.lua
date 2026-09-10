@@ -198,6 +198,82 @@ function handlers.expose_service(engine, input, now, out)
 end
 
 --------------------------------------------------------------------------
+-- LAN admission
+--------------------------------------------------------------------------
+
+-- A LAN Password is gameplay-grade admission, not strong hostile-radio
+-- security, so the one thing that must not be free is guessing at it. Failures
+-- are counted per claimed identity and again across the whole LAN, because an
+-- attacker rotating identities would otherwise slip past a per-identity limit.
+handlers.LAN_FAILURE_LIMIT = 5
+handlers.LAN_SWEEP_LIMIT = 20
+handlers.LAN_WINDOW_MS = 60000
+handlers.LAN_BLOCK_MS = 60000
+
+local function bucket(engine, key, now)
+  engine.admission = engine.admission or {}
+  local entry = engine.admission[key]
+  if not entry or (now - entry.window_started_ms) >= handlers.LAN_WINDOW_MS then
+    entry = { failures = 0, window_started_ms = now, blocked_until_ms = 0 }
+    engine.admission[key] = entry
+  end
+  return entry
+end
+
+local function admissionKey(input)
+  -- Before enrollment there is no proven identity, so the key is what the
+  -- caller claims. The sweep bucket is what stops that from being a way out.
+  return "peer:" .. tostring(input.client_id or input.requested_name or "anonymous")
+end
+
+-- lan_admission answers whether a join attempt may even be considered. A
+-- blocked caller is refused with the same code a wrong password produces: an
+-- attacker learns nothing from being told it is being throttled.
+function handlers.lan_admission(engine, input, now, out)
+  local peer = bucket(engine, admissionKey(input), now)
+  local sweep = bucket(engine, "sweep", now)
+
+  if now < peer.blocked_until_ms or now < sweep.blocked_until_ms then
+    return out:fail("authentication_failed", "too many failed joins")
+  end
+  out:ok({ permitted = true })
+end
+
+-- lan_failure records a rejected join. Nothing durable changes: a restart is
+-- disruptive enough on its own, and an Operator should not have to clear a
+-- counter to let a Computer back in.
+function handlers.lan_failure(engine, input, now, out)
+  local peer = bucket(engine, admissionKey(input), now)
+  local sweep = bucket(engine, "sweep", now)
+  peer.failures = peer.failures + 1
+  sweep.failures = sweep.failures + 1
+
+  if peer.failures >= handlers.LAN_FAILURE_LIMIT then
+    peer.blocked_until_ms = now + handlers.LAN_BLOCK_MS
+  end
+  if sweep.failures >= handlers.LAN_SWEEP_LIMIT then
+    sweep.blocked_until_ms = now + handlers.LAN_BLOCK_MS
+  end
+
+  out:ephemeral("lan_join_refused", {
+    failures = peer.failures, blocked = peer.blocked_until_ms > now,
+  })
+  out:ok({
+    failures = peer.failures,
+    sweep_failures = sweep.failures,
+    blocked = peer.blocked_until_ms > now or sweep.blocked_until_ms > now,
+  })
+end
+
+-- lan_success clears the counters for a caller that got in, so one mistyped
+-- password does not follow a Computer around.
+function handlers.lan_success(engine, input, now, out)
+  engine.admission = engine.admission or {}
+  engine.admission[admissionKey(input)] = nil
+  out:ok({ cleared = true })
+end
+
+--------------------------------------------------------------------------
 -- Reconciliation
 --------------------------------------------------------------------------
 

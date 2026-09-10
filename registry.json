@@ -35,6 +35,20 @@
           "manifest": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-runtime/0.1.0.json"
         }
       }
+    },
+    "craftnet-router": {
+      "versions": {
+        "0.1.0": {
+          "manifest": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-router/0.1.0.json"
+        }
+      }
+    },
+    "craftnet-computer": {
+      "versions": {
+        "0.1.0": {
+          "manifest": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-computer/0.1.0.json"
+        }
+      }
     }
   }
 }

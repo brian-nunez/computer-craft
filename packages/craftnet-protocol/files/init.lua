@@ -70,6 +70,21 @@ protocol.parentEnrollment = handshake.parentEnrollment
 protocol.childSession = handshake.childSession
 protocol.parentSession = handshake.parentSession
 
+-- Before a session exists there are still two framings a role package has to
+-- put on the wire itself: the unauthenticated discovery that finds a parent,
+-- and the outer proof that carries an enrollment or a reconnect. They are
+-- public for that reason and no other -- neither one calculates a MAC, a
+-- counter, or a canonical form on the caller's behalf.
+protocol.discovery = {
+  seal = frame.sealDiscovery,
+  open = frame.openDiscovery,
+}
+
+protocol.handshake = {
+  seal = frame.sealHandshake,
+  open = frame.openHandshake,
+}
+
 --------------------------------------------------------------------------
 -- Errors and limits
 --------------------------------------------------------------------------

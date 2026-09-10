@@ -56,7 +56,9 @@ function runtimePackage.withPackages(packages)
   local runtime = internal("runtime")
   local connectivity = internal("connectivity")
   local snapshot = internal("snapshot")
+  local secrets = internal("secrets")
   local screen = internal("screen")
+  local links = internal("links")
 
   return {
     name = runtimePackage.name,
@@ -68,8 +70,13 @@ function runtimePackage.withPackages(packages)
 
     -- The pieces a composition root or a test may want on their own.
     snapshot = snapshot,
+    secrets = secrets,
     connectivity = connectivity,
     screen = screen,
+
+    -- newLinks builds the session-carrying links adapter over any transport,
+    -- which is what makes a whole vertical slice testable without a modem.
+    newLinks = links.new,
 
     -- The real CraftOS adapters. They are the only files in CraftNet that
     -- reference fs, os, or peripheral, and they are loaded on demand so that a

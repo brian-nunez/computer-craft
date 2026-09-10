@@ -1,0 +1,16 @@
+{
+  "name": "craftnet-router",
+  "version": "0.1.0",
+  "dependencies": {
+    "craftnet-runtime": "^0.1.0"
+  },
+  "files": {
+    "init.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-router/files/init.lua",
+    "router.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-router/files/router.lua",
+    "lan.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-router/files/lan.lua",
+    "wizard.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-router/files/wizard.lua",
+    "bootstrap.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-router/files/bootstrap.lua",
+    "setup.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-router/files/setup.lua",
+    "startup.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-router/files/startup.lua"
+  }
+}

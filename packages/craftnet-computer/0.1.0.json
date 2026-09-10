@@ -1,0 +1,15 @@
+{
+  "name": "craftnet-computer",
+  "version": "0.1.0",
+  "dependencies": {
+    "craftnet-runtime": "^0.1.0"
+  },
+  "files": {
+    "init.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-computer/files/init.lua",
+    "computer.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-computer/files/computer.lua",
+    "join.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-computer/files/join.lua",
+    "bootstrap.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-computer/files/bootstrap.lua",
+    "setup.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-computer/files/setup.lua",
+    "startup.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-computer/files/startup.lua"
+  }
+}
