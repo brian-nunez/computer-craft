@@ -48,13 +48,18 @@ function engine.new(options)
     links = {},
     parentRelationshipId = nil,
     buffer = events.newBuffer(role),
+    -- The bound belongs to the protocol: a role and a link must agree on how
+    -- much one relationship may have outstanding, or one of them queues what
+    -- the other already refused.
     flows = flows.newTable({
       prefix = options.flow_prefix or (role .. "-flow"),
       idle_ms = options.flow_idle_ms,
+      capacity = options.in_flight or protocol.limits.RELATIONSHIP_IN_FLIGHT,
     }),
     transit = flows.newTable({
       prefix = options.transit_prefix or (role .. "-transit"),
       idle_ms = options.flow_idle_ms,
+      capacity = options.in_flight or protocol.limits.RELATIONSHIP_IN_FLIGHT,
     }),
     nextRequestNumber = 1,
     nextEventNumber = 1,
@@ -281,11 +286,14 @@ function engine.shared.reconcile(instance, input, now, out)
   end
   local known = instance.state.parent_revision or 0
   local requestId = instance:allocateRequestId()
-  instance.transit:open({
+  local pending = instance.transit:open({
     relationship_id = instance.parentRelationshipId,
     request_id = requestId,
     intent = "reconcile",
   }, now)
+  if not pending then
+    return out:fail("busy", "this relationship already holds its outstanding requests")
+  end
   out:send(instance.parentRelationshipId, "config_request",
     protocol.object({ known_revision = known }), requestId)
   out:ok({ known_revision = known, request_id = requestId })

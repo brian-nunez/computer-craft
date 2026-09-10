@@ -69,5 +69,5 @@ if not applied then
 end
 
 print()
-print("Done. Computers join with:  craftnet join")
+print("Done. Computers join with:  setup")
 print("Start the router with:      startup")

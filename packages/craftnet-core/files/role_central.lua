@@ -360,13 +360,23 @@ function messages.service_request(engine, link, message, now, out)
   end
 
   local onwardRequestId = engine:allocateRequestId()
-  engine.transit:open({
+  local pending = engine.transit:open({
     relationship_id = relationshipId,
     request_id = onwardRequestId,
     reply_to_relationship_id = link.relationship_id,
     reply_to_request_id = message.request_id,
     service = service,
   }, now)
+  if not pending then
+    engine:record(out, eventBase(engine, {
+      direction = "outbound", kind = "service_request", operation = service,
+      outcome = "busy", bytes = bytes, request_id = message.request_id,
+      isp_id = route.isp_id, customer_network_id = destinationNetwork,
+    }), now)
+    out:replyError(link.relationship_id, message.request_id, "busy",
+      "that ISP already holds its outstanding requests")
+    return out:fail("busy", "the onward relationship is at capacity")
+  end
   out:send(relationshipId, "service_request", body, onwardRequestId)
   engine:record(out, eventBase(engine, {
     direction = "inbound", kind = "service_request", operation = service,
@@ -469,12 +479,17 @@ function messages.dns_query(engine, link, message, now, out)
   end
 
   local onwardRequestId = engine:allocateRequestId()
-  engine.transit:open({
+  local pending = engine.transit:open({
     relationship_id = relationshipId,
     request_id = onwardRequestId,
     reply_to_relationship_id = link.relationship_id,
     reply_to_request_id = message.request_id,
   }, now)
+  if not pending then
+    out:replyError(link.relationship_id, message.request_id, "busy",
+      "that ISP already holds its outstanding requests")
+    return out:fail("busy", "the onward relationship is at capacity")
+  end
   out:send(relationshipId, "dns_query", message.body, onwardRequestId)
   out:ok({ forwarded = true, isp_id = targetIspId })
 end

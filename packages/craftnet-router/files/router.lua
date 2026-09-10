@@ -248,7 +248,9 @@ function Router:establishUpstream()
   local state = self:state()
   local credential = self.secrets:get(state.upstream_credential_ref or "")
   if not credential then return nil, "this router has no Router Credential" end
+  -- Durable, so a restart never repeats a nonce its ISP already saw.
   state.upstream_session_generation = (state.upstream_session_generation or 0) + 1
+  self.runtime.store:save(state, self.clock:now())
 
   local result, code, problem = runtimePackage.enroll.session({
     transport = self.transport,
