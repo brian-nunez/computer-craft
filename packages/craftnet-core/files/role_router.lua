@@ -408,7 +408,7 @@ local function deliverLocally(engine, out, now, options)
   end
 
   local onwardRequestId = engine:allocateRequestId()
-  engine.transit:open({
+  local pending = engine.transit:open({
     relationship_id = targetRelationship,
     request_id = onwardRequestId,
     reply_to_relationship_id = options.reply_to_relationship_id,
@@ -419,6 +419,9 @@ local function deliverLocally(engine, out, now, options)
     computer_id = target.computer_id,
     service = options.service,
   }, now)
+  if not pending then
+    return false, "busy", "that Computer already holds its outstanding requests"
+  end
   out:ephemeral("transit_opened", { request_id = onwardRequestId })
 
   local body = protocol.object({
@@ -492,6 +495,16 @@ function messages.service_request(engine, link, message, now, out)
       local_address = target.address,
       role = "destination",
     }, now)
+    if not flow then
+      engine:record(out, eventBase(engine, {
+        direction = "inbound", kind = "service_request", operation = service,
+        outcome = "busy", bytes = bytes, request_id = message.request_id,
+        computer_id = target.computer_id,
+      }), now)
+      out:replyError(link.relationship_id, message.request_id, "busy",
+        "this relationship already holds its outstanding requests")
+      return out:fail("busy", "the inbound relationship is at capacity")
+    end
     out:ephemeral("flow_opened", { flow_id = flow.flow_id, role = "destination" })
 
     local ok, code, problem = deliverLocally(engine, out, now, {
@@ -592,6 +605,16 @@ function messages.service_request(engine, link, message, now, out)
     service = service,
     role = "source",
   }, now)
+  if not flow then
+    engine:record(out, eventBase(engine, {
+      direction = "outbound", kind = "service_request", operation = service,
+      outcome = "busy", bytes = bytes, request_id = message.request_id,
+      computer_id = binding.computer_id,
+    }), now)
+    out:replyError(link.relationship_id, message.request_id, "busy",
+      "this router already holds its outstanding requests upstream")
+    return out:fail("busy", "the uplink is at capacity")
+  end
   out:ephemeral("flow_opened", { flow_id = flow.flow_id, role = "source" })
 
   out:send(engine.parentRelationshipId, "service_request", protocol.object({
@@ -739,13 +762,18 @@ function messages.dns_query(engine, link, message, now, out)
   end
 
   local onwardRequestId = engine:allocateRequestId()
-  engine.transit:open({
+  local pending = engine.transit:open({
     relationship_id = engine.parentRelationshipId,
     request_id = onwardRequestId,
     reply_to_relationship_id = link.relationship_id,
     reply_to_request_id = message.request_id,
     delivery = "dns",
   }, now)
+  if not pending then
+    out:replyError(link.relationship_id, message.request_id, "busy",
+      "this router already holds its outstanding requests upstream")
+    return out:fail("busy", "the uplink is at capacity")
+  end
   out:send(engine.parentRelationshipId, "dns_query",
     protocol.object({ name = parsed.normalized }), onwardRequestId)
   out:ok({ delegated = true })

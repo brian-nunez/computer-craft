@@ -16,6 +16,13 @@ local flows = {}
 -- with nat_flow_missing rather than being guessed at.
 flows.IDLE_MS = 30000
 
+-- How many correlated requests one immediate relationship may have outstanding
+-- at once. Past it, work is refused with `busy` rather than queued: a queue
+-- without a bound is only a slower way of failing, and it fails later, larger,
+-- and somewhere less obvious. The number itself belongs to the protocol; this
+-- is the fallback for a table built without one.
+flows.PER_RELATIONSHIP = 64
+
 local Table = {}
 Table.__index = Table
 
@@ -24,9 +31,11 @@ function flows.newTable(options)
   return setmetatable({
     prefix = options.prefix or "flow",
     idleMs = options.idle_ms or flows.IDLE_MS,
+    capacity = options.capacity or flows.PER_RELATIONSHIP,
     nextNumber = options.first_number or 1,
     byId = {},
     byRequest = {},
+    outstanding = {},
     count = 0,
   }, Table)
 end
@@ -44,13 +53,25 @@ local function correlationKey(relationshipId, requestId)
   return relationshipId .. "\0" .. requestId
 end
 
+-- outstandingOn reports how much of one relationship's capacity is in use.
+function Table:outstandingOn(relationshipId)
+  return self.outstanding[relationshipId] or 0
+end
+
 -- open records a new flow. `record` carries whatever the owning role needs to
 -- send a reply back: for a source router that is the Computer and its address;
 -- for a forwarding hop it is the relationship the request arrived on.
+--
+-- It answers nil when the relationship already holds its capacity, and the
+-- caller turns that into `busy`. Refusing here rather than at the wire is
+-- deliberate: this is where the memory would actually accumulate.
 function Table:open(record, now)
   assert(type(record) == "table", "a flow needs a record")
   assert(record.relationship_id, "a flow needs the relationship it arrived on")
   assert(record.request_id, "a flow needs a Request ID")
+
+  local held = self.outstanding[record.relationship_id] or 0
+  if held >= self.capacity then return nil end
 
   local identifier = record.flow_id or self:allocateId()
   local entry = {}
@@ -61,8 +82,21 @@ function Table:open(record, now)
 
   self.byId[identifier] = entry
   self.byRequest[correlationKey(record.relationship_id, record.request_id)] = entry
+  self.outstanding[record.relationship_id] = held + 1
   self.count = self.count + 1
   return entry
+end
+
+-- release gives one relationship's capacity back. Every removal goes through
+-- it, so the count can never drift away from what is actually held.
+local function release(self, entry)
+  local held = (self.outstanding[entry.relationship_id] or 1) - 1
+  if held <= 0 then
+    self.outstanding[entry.relationship_id] = nil
+  else
+    self.outstanding[entry.relationship_id] = held
+  end
+  self.count = self.count - 1
 end
 
 function Table:byFlowId(identifier)
@@ -94,7 +128,7 @@ function Table:close(identifier)
   if not entry then return nil end
   self.byId[identifier] = nil
   self.byRequest[correlationKey(entry.relationship_id, entry.request_id)] = nil
-  self.count = self.count - 1
+  release(self, entry)
   return entry
 end
 
@@ -107,7 +141,7 @@ function Table:expire(now)
       expired[#expired + 1] = entry
       self.byId[identifier] = nil
       self.byRequest[correlationKey(entry.relationship_id, entry.request_id)] = nil
-      self.count = self.count - 1
+      release(self, entry)
     end
   end
   -- Deterministic order, because pairs() is not and a simulator compares runs.
@@ -117,6 +151,12 @@ end
 
 function Table:size()
   return self.count
+end
+
+-- capacityOf is what a test and a diagnostic screen both read, so neither
+-- carries a second copy of the number.
+function Table:capacityOf()
+  return self.capacity
 end
 
 return flows

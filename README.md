@@ -5,16 +5,19 @@ model one Central Server, multiple ISPs, Customer Routers, and Computers, while
 the Go External Application provides the controlled WebSocket gateway and
 operator dashboard.
 
-Implementation Milestone 7 is complete: a World is now something an Operator can
-look at. `craftnetd` serves an embedded dashboard on the same origin as its
-Gateway, with cookie sign-in, a topology canvas, linked traffic and incident
-views, and confirmed Enable/Disable of a Customer Network that travels all the
-way to authoritative in-world state. The in-world Gateway transport is still
-deferred, and the acceptance runs for Milestones 4, 5, and 7 have not been
-performed — see [the checklists](docs/implementation/acceptance/). The complete design and
-delivery gates are indexed in
-[the CraftNet v1 map](.scratch/craftnet-v1/map.md), and completed-gate evidence
-is recorded under [`docs/implementation/`](docs/implementation/).
+All eight implementation milestones are built. The automated half of the v1
+release gate passes: 253 Lua tests, the Go suite under `-race`, a 1,685-entity
+scale simulation over 10,000 seeded operations, a full restart matrix, and a
+malformed-input corpus. The gate itself is **not** met — the in-world Gateway
+transport is not built, and no acceptance run has been performed in Minecraft.
+[The acceptance report](docs/implementation/acceptance/report-v0.1.0.md) says
+exactly what is proved and what is not, and this repository stays at
+`0.1.0-dev` until it is.
+
+The complete design and delivery gates are indexed in [the CraftNet v1
+map](.scratch/craftnet-v1/map.md); milestone evidence is under
+[`docs/implementation/`](docs/implementation/), and [the release
+notes](docs/releases/v0.1.0.md) state the tested scale and the v1 exclusions.
 
 ## Supported development versions
 
@@ -32,7 +35,7 @@ local feedback.
 
 ## Development commands
 
-Run the complete Milestone 7 gate from the repository root:
+Run the complete release gate from the repository root:
 
 ```bash
 make test
@@ -188,6 +191,14 @@ counters it has spent.
 A Customer Network works perfectly well without an ISP. `uplink` is what makes
 it reachable from another one.
 
+Once it is up, a router has `expose HOSTNAME SERVICE` (nothing is reachable from
+another network until it does) and `revoke HOSTNAME`. Every Computer has
+`craftnet status`, `craftnet resolve NAME`, and `craftnet call NAME SERVICE`.
+
+[The setup guide](docs/operations/setup.md) is the whole procedure in order, and
+[the recovery guide](docs/operations/recovery.md) is organised by what you will
+actually see when something breaks.
+
 ## The External Application
 
 [`external/`](external/) is one Go binary: `craftnetd`. It serves the Central
@@ -257,7 +268,9 @@ spec/protocol/v1/         cross-language protocol fixture catalog
 tests/lua/                portable Lua test runner, support, and suites
 scripts/                  local and CI entry points
 docs/adr/                 accepted architecture decisions
-docs/implementation/      completed-milestone gate evidence
+docs/operations/          setup and recovery, for whoever runs it
+docs/releases/            release notes
+docs/implementation/      milestone gate evidence and acceptance reports
 .scratch/craftnet-v1/     resolved design and delivery tickets
 ```
 

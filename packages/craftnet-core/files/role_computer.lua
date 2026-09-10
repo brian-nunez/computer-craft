@@ -108,12 +108,15 @@ function handlers.resolve(engine, input, now, out)
   end
 
   local requestId = engine:allocateRequestId()
-  engine.transit:open({
+  local pending = engine.transit:open({
     relationship_id = engine.parentRelationshipId,
     request_id = requestId,
     intent = "resolve",
     name = parsed.normalized,
   }, now)
+  if not pending then
+    return out:fail("busy", "this Computer already holds its outstanding requests")
+  end
   out:send(engine.parentRelationshipId, "dns_query",
     protocol.object({ name = parsed.normalized }), requestId)
   out:ok({ kind = "computer", pending = requestId, name = parsed.normalized })
@@ -150,12 +153,15 @@ function handlers.local_request(engine, input, now, out)
   end
 
   local requestId = engine:allocateRequestId()
-  engine.transit:open({
+  local outstanding = engine.transit:open({
     relationship_id = engine.parentRelationshipId,
     request_id = requestId,
     intent = "request",
     service = input.service,
   }, now)
+  if not outstanding then
+    return out:fail("busy", "this Computer already holds its outstanding requests")
+  end
 
   -- The source is stated for completeness, but the router replaces it from the
   -- authenticated session rather than trusting what is written here.
@@ -200,6 +206,11 @@ function messages.service_request(engine, link, message, now, out)
     reply_to_request_id = message.request_id,
     intent = "serve",
   }, now)
+  if not pending then
+    out:replyError(link.relationship_id, message.request_id, "busy",
+      "this Computer already holds its outstanding requests")
+    return out:fail("busy", "this Computer is at capacity")
+  end
   out:ephemeral("request_pending", { pending_id = pending.flow_id })
 
   engine:record(out, {

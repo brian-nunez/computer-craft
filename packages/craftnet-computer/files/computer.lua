@@ -156,7 +156,13 @@ function Computer:establish()
   local credential = self.secrets:get("lan-credential")
   if not credential then return nil, "this Computer has no LAN Credential" end
 
+  -- The generation is durable on purpose. It is what makes each session's
+  -- nonce different from the last, so a Computer that restarts must not start
+  -- counting again: its parent would see the same nonce twice and refuse it as
+  -- a replay, and the Computer would sit there unable to reconnect.
   state.session_generation = (state.session_generation or 0) + 1
+  self.runtime.store:save(state, self.clock:now())
+
   local result, code, problem = join.reconnect({
     transport = self.transport,
     clock = self.clock,

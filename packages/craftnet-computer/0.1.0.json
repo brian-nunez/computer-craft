@@ -10,6 +10,7 @@
     "join.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-computer/files/join.lua",
     "bootstrap.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-computer/files/bootstrap.lua",
     "setup.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-computer/files/setup.lua",
-    "startup.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-computer/files/startup.lua"
+    "startup.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-computer/files/startup.lua",
+    "craftnet.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-computer/files/craftnet.lua"
   }
 }

@@ -290,17 +290,39 @@ end
 -- forward relays a request onward and remembers how to retrace it. The record
 -- is keyed by the outgoing leg, so the reply that comes back on that leg finds
 -- exactly one way home.
+--
+-- It answers nil when the outgoing leg already holds everything it may have
+-- outstanding, having already told the caller so. Refusing is the whole point:
+-- an ISP that queued instead would turn one slow router into a growing backlog
+-- for every Customer Network it serves.
 local function forward(engine, out, now, options)
   local onwardRequestId = engine:allocateRequestId()
-  engine.transit:open({
+  local pending = engine.transit:open({
     relationship_id = options.to_relationship_id,
     request_id = onwardRequestId,
     reply_to_relationship_id = options.from_relationship_id,
     reply_to_request_id = options.from_request_id,
     service = options.service,
   }, now)
+  if not pending then
+    if options.service then
+      engine:record(out, eventBase(engine, {
+        direction = "outbound", kind = "service_request", operation = options.service,
+        outcome = "busy", bytes = engine:measure(options.body),
+        request_id = options.from_request_id,
+      }), now)
+    end
+    out:replyError(options.from_relationship_id, options.from_request_id, "busy",
+      "the next relationship already holds its outstanding requests")
+    return nil
+  end
   out:send(options.to_relationship_id, options.message_kind, options.body, onwardRequestId)
   return onwardRequestId
+end
+
+-- atCapacity is the one line each caller needs after forward.
+local function atCapacity(out)
+  return out:fail("busy", "the onward relationship is at capacity")
 end
 
 function messages.service_request(engine, link, message, now, out)
@@ -329,7 +351,7 @@ function messages.service_request(engine, link, message, now, out)
         "that Customer Router is not connected")
       return out:fail("router_unavailable", "destination router is offline")
     end
-    forward(engine, out, now, {
+    local relayed = forward(engine, out, now, {
       to_relationship_id = relationshipId,
       from_relationship_id = link.relationship_id,
       from_request_id = message.request_id,
@@ -337,6 +359,7 @@ function messages.service_request(engine, link, message, now, out)
       body = body,
       service = service,
     })
+    if not relayed then return atCapacity(out) end
     return out:ok({ forwarded = "down", router_id = router.router_id })
   end
 
@@ -366,7 +389,7 @@ function messages.service_request(engine, link, message, now, out)
     return out:fail("upstream_unavailable", "no parent relationship")
   end
 
-  forward(engine, out, now, {
+  local relayed = forward(engine, out, now, {
     to_relationship_id = engine.parentRelationshipId,
     from_relationship_id = link.relationship_id,
     from_request_id = message.request_id,
@@ -374,6 +397,7 @@ function messages.service_request(engine, link, message, now, out)
     body = body,
     service = service,
   })
+  if not relayed then return atCapacity(out) end
   out:ok({ forwarded = "up" })
 end
 
@@ -448,13 +472,13 @@ function messages.dns_query(engine, link, message, now, out)
         "that Customer Router is not connected")
       return out:fail("router_unavailable", "destination router is offline")
     end
-    forward(engine, out, now, {
+    if not forward(engine, out, now, {
       to_relationship_id = relationshipId,
       from_relationship_id = link.relationship_id,
       from_request_id = message.request_id,
       message_kind = "dns_query",
       body = message.body,
-    })
+    }) then return atCapacity(out) end
     return out:ok({ forwarded = "down" })
   end
 
@@ -468,13 +492,13 @@ function messages.dns_query(engine, link, message, now, out)
       "this ISP has no connection to the Central Server")
     return out:fail("upstream_unavailable", "no parent relationship")
   end
-  forward(engine, out, now, {
+  if not forward(engine, out, now, {
     to_relationship_id = engine.parentRelationshipId,
     from_relationship_id = link.relationship_id,
     from_request_id = message.request_id,
     message_kind = "dns_query",
     body = message.body,
-  })
+  }) then return atCapacity(out) end
   out:ok({ forwarded = "up" })
 end
 

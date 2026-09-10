@@ -172,7 +172,9 @@ function ISP:establish()
   local state = self:state()
   local credential = self.secrets:get(state.credential_ref or "")
   if not credential then return nil, "this ISP has no Credential" end
+  -- Durable, so a restart never repeats a nonce its parent already saw.
   state.session_generation = (state.session_generation or 0) + 1
+  self.runtime.store:save(state, self.clock:now())
 
   local result, code, problem = runtimePackage.enroll.session({
     transport = self.transport,

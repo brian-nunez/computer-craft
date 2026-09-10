@@ -1,263 +1,25 @@
 -- The whole World, standing up and carrying traffic.
 --
 -- Every node here is a real role package over a real runtime, real links, real
--- protocol, and real engines. The hierarchy is provisioned the way an Operator
--- would provision it: a bundle from the External Application, then one-time
--- tokens carried from one screen to the next, then Computers joining with a
--- LAN Password. Nothing is written into a node's state by hand.
+-- protocol, and real engines, stood up by the shared World builder.
 --
 -- What is being proved is scenarios 1, 3, 6, and 7: the hierarchy matches the
 -- reference topology, overlapping addresses stay unambiguous, Home reaches Farm
 -- around the Central Server, and the ways it can fail each fail distinctly.
 
-local protocol = dofile("packages/craftnet-protocol/files/init.lua")
-local core = dofile("packages/craftnet-core/files/init.lua").withProtocol(protocol)
-local runtimePackage = dofile("packages/craftnet-runtime/files/init.lua")
-  .withPackages({ protocol = protocol, core = core })
-local packages = { protocol = protocol, core = core, runtime = runtimePackage }
+local worlds = require("tests.lua.support.world")
 
-local centralPackage = dofile("packages/craftnet-central/files/init.lua").withPackages(packages)
-local ispPackage = dofile("packages/craftnet-isp/files/init.lua").withPackages(packages)
-local routerPackage = dofile("packages/craftnet-router/files/init.lua").withPackages(packages)
-local computerPackage = dofile("packages/craftnet-computer/files/init.lua").withPackages(packages)
+local protocol = worlds.protocol
+local core = worlds.core
+local ispPackage = worlds.isp
 
-local fakes = require("tests.lua.support.fakes")
-local lanworld = require("tests.lua.support.lanworld")
+local BUNDLE = worlds.BUNDLE
+local LAN_PASSWORD = worlds.LAN_PASSWORD
+local NETWORKS = worlds.NETWORKS
+local newWorld = worlds.new
+local fullWorld = worlds.full
 
 local get = rawget
-
--- Fixture material, not credentials: a real World Key comes from crypto/rand in
--- the Go provisioning command.
-local BUNDLE = {
-  world_id = "world-overworld",
-  central_id = "central-main",
-  gateway_url = "wss://127.0.0.1:8080/gateway",
-  gateway_credential_ref = "gateway-credential",
-  world_key = string.rep("a1", 32),
-  gateway_credential = string.rep("b2", 32),
-}
-
-local LAN_PASSWORD = "correct horse battery staple"
-
-local NETWORKS = {
-  home = {
-    name = "home", router_id = "router-home", network_id = "network-home",
-    lan_channel = 42201,
-    computers = { "alex-pc", "wall-display" },
-  },
-  farm = {
-    name = "farm", router_id = "router-farm", network_id = "network-farm",
-    lan_channel = 42202,
-    computers = { "harvester", "silo-monitor" },
-  },
-}
-
---------------------------------------------------------------------------
--- Standing up a World
---------------------------------------------------------------------------
-
-local World = {}
-World.__index = World
-
-local function assertOk(value, code, problem, what)
-  assert(value, (what or "step") .. " failed: " .. tostring(code) .. " " .. tostring(problem))
-  return value
-end
-
--- newWorld builds every node but starts nothing talking. Each gets its own fake
--- disk, so a restart touches one node and nothing else.
-local function newWorld()
-  local clock = fakes.clock()
-  local world = setmetatable({
-    air = lanworld.new({ clock = clock, step_ms = 50 }),
-    clock = clock,
-    storage = {},
-    nodes = {},
-    order = {},
-  }, World)
-  return world
-end
-
-function World:disk(name)
-  self.storage[name] = self.storage[name] or fakes.storage()
-  return self.storage[name]
-end
-
-function World:adapters(name)
-  return {
-    transport = self.air:attach(name),
-    clock = self.clock,
-    storage = self:disk(name),
-    screen = fakes.screen(),
-  }
-end
-
--- pump runs every node that is already up, alongside a driver, until the driver
--- finishes. This is what makes a blocking wizard call work: the parent is
--- serving while the child waits.
-function World:pump(driver, except)
-  local finished = false
-  for _, name in ipairs(self.order) do
-    if name ~= except then
-      local node = self.nodes[name]
-      self.air:spawn(name .. "-loop", function()
-        while not finished do node:serve(100) end
-      end)
-    end
-  end
-  self.air:spawn("driver", function()
-    driver()
-    finished = true
-  end)
-  self.air:run()
-  self.air.order = {}
-end
-
-function World:register(name, node)
-  self.nodes[name] = node
-  self.order[#self.order + 1] = name
-  return node
-end
-
--- provision runs scenario 1 from the top: the Central Server takes its bundle,
--- issues an ISP Enrollment Token, and the ISP spends it.
-function World:provision()
-  self.central = centralPackage.new({ path = "state/central", adapters = self:adapters("central") })
-  assert(self.central:start())
-  assertOk(self.central:provision(BUNDLE), nil, nil, "provision")
-  self:register("central", self.central)
-
-  local token = assertOk(self.central:issueToken(), nil, nil, "issue an ISP token")
-  self.ispToken = token
-
-  self.isp = ispPackage.new({ path = "state/isp", adapters = self:adapters("acme") })
-  assert(self.isp:start())
-  assertOk(self.isp:configure({ isp_id = "isp-acme", isp_name = "acme" }), nil, nil, "configure isp")
-
-  local enrolled
-  self:pump(function()
-    local value, code, problem = self.isp:enrollUpstream({ token = token, timeout_ms = 4000 })
-    enrolled = assertOk(value, code, problem, "enroll the ISP")
-    assertOk(self.isp:connectUpstream())
-  end)
-  self:register("acme", self.isp)
-  self.ispEnrollment = enrolled
-  return enrolled
-end
-
--- addNetwork runs a Customer Router through its own wizard, then spends a
--- Router Enrollment Token to put it on CraftNet.
-function World:addNetwork(key)
-  local spec = NETWORKS[key]
-  local node = routerPackage.new({ path = "state/router", adapters = self:adapters(spec.router_id) })
-  assert(node:start())
-  assertOk(node:configure({
-    router_id = spec.router_id,
-    customer_network_id = spec.network_id,
-    customer_network_name = spec.name,
-    router_address = "192.168.1.1",
-    pool_first = "192.168.1.20",
-    pool_last = "192.168.1.39",
-    lan_operational_channel = spec.lan_channel,
-    world_id = BUNDLE.world_id,
-  }, LAN_PASSWORD), nil, nil, "configure " .. spec.router_id)
-
-  local token = assertOk(self.isp:issueToken(), nil, nil, "issue a Router token")
-  local enrolled
-  self:pump(function()
-    local value, code, problem = node:enrollUpstream({
-      token = token, isp_name = "acme", timeout_ms = 4000,
-    })
-    enrolled = assertOk(value, code, problem, "enroll " .. spec.router_id)
-    assertOk(node:connectUpstream())
-  end)
-
-  self:register(spec.router_id, node)
-  self[key] = node
-  return enrolled
-end
-
-function World:addComputer(key, hostname, number)
-  local spec = NETWORKS[key]
-  local node = computerPackage.new({
-    path = "state/computer",
-    computer_number = number,
-    adapters = self:adapters(hostname),
-    -- The application answers whatever service it is asked for, and says who
-    -- answered, so a reply that reached the wrong Computer would be visible
-    -- rather than merely suspected.
-    application = setmetatable({}, {
-      __index = function()
-        return function(payload)
-          return protocol.object({ answered_by = hostname, token = get(payload, "token") })
-        end
-      end,
-    }),
-  })
-  assert(node:start())
-
-  local joined
-  self:pump(function()
-    local value, code, problem = node:joinNetwork({
-      password = LAN_PASSWORD,
-      hostname = hostname,
-      customer_network_name = spec.name,
-      timeout_ms = 4000,
-    })
-    joined = assertOk(value, code, problem, "join " .. hostname)
-    assertOk(node:connect())
-  end)
-  self:register(hostname, node)
-  self.nodes[hostname] = node
-  return joined, node
-end
-
--- expose publishes a service, which is the only way a Computer becomes
--- reachable from another Customer Network.
-function World:expose(key, computerId, service)
-  local spec = NETWORKS[key]
-  local outcome = self.nodes[spec.router_id].runtime:submit({
-    kind = "expose_service", computer_id = computerId, service = service,
-  })
-  assert(outcome.result.ok, "expose failed: " .. tostring(outcome.result.message))
-end
-
--- ask sends one request from a Computer and waits for the answer.
-function World:ask(from, destination, service, payload)
-  local node = self.nodes[from]
-  local answer
-  -- The asking Computer is served by the driver itself, so nothing else is
-  -- pulling frames out from under it.
-  self:pump(function()
-    node:request(destination, service, payload or protocol.object())
-    for _ = 1, 60 do
-      local outcome = node:serve(200)
-      if outcome and outcome.result
-        and (outcome.result.payload ~= nil or outcome.result.ok == false) then
-        answer = outcome.result
-        break
-      end
-    end
-  end, from)
-  return answer
-end
-
--- fullWorld is the reference topology, stood up end to end.
-local function fullWorld()
-  local world = newWorld()
-  world:provision()
-  world:addNetwork("home")
-  world:addNetwork("farm")
-  world.bindings = {}
-  world.bindings["alex-pc"] = world:addComputer("home", "alex-pc", 1)
-  world.bindings["wall-display"] = world:addComputer("home", "wall-display", 2)
-  world.bindings["harvester"] = world:addComputer("farm", "harvester", 3)
-  world.bindings["silo-monitor"] = world:addComputer("farm", "silo-monitor", 4)
-
-  world:expose("farm", world.bindings["harvester"].computer_id, "harvester.status")
-  world:expose("home", world.bindings["wall-display"].computer_id, "display.update")
-  return world
-end
 
 --------------------------------------------------------------------------
 -- Scenario 1 -- provision the hierarchy
@@ -738,4 +500,82 @@ test("a disabled Customer Network cannot reach the External Application either",
   })
   assertTrue(not outcome.result.ok, "the call was refused")
   assertEqual(outcome.result.code, "network_disabled", "code")
+end)
+
+--------------------------------------------------------------------------
+-- Credential revocation
+--------------------------------------------------------------------------
+
+test("revoking a LAN Credential removes the Computer and frees its address", function()
+  local world = fullWorld()
+  local computerId = world.bindings["alex-pc"].computer_id
+
+  local before = world.nodes["router-home"]:state()
+  local relationshipId
+  for id, childId in pairs(before.relationships or {}) do
+    if childId == computerId then relationshipId = id end
+  end
+  assertTrue(relationshipId ~= nil, "the router holds a relationship for alex-pc")
+  assertEqual(before.bindings[computerId].address, "192.168.1.20", "and its Address Binding")
+
+  assertTrue(world.nodes["router-home"]:revoke(relationshipId), "revoke")
+
+  local after = world.nodes["router-home"]:state()
+  assertTrue(after.relationships[relationshipId] == nil, "the relationship is gone")
+  assertTrue(after.bindings[computerId] == nil, "and so is the Address Binding")
+  assertTrue(world.nodes["router-home"].secrets:get(
+    world.nodes["router-home"]:secretReference(relationshipId)) == nil,
+    "the credential itself is gone from the secret store")
+
+  -- The Computer still holds its own copy, and it gets it nowhere: the router
+  -- no longer has anything to check it against.
+  world:settle()
+  local value, code
+  world:pump(function()
+    value, code = world.nodes["alex-pc"]:connect()
+  end, "alex-pc")
+  assertTrue(value == nil, "a revoked Computer must not reconnect")
+  assertEqual(code, "router_unavailable", "code")
+
+  -- Its neighbour is untouched. Revoking one credential is not an outage.
+  local answer = world:ask("wall-display", {
+    customer_network_id = "network-farm",
+    computer_id = world.bindings["harvester"].computer_id,
+  }, "harvester.status", protocol.object({ token = "after-revoke" }))
+  assertTrue(answer and answer.payload, "wall-display still works")
+  assertEqual(get(answer.payload, "answered_by"), "harvester", "and reaches the right Computer")
+end)
+
+test("a revoked Computer rejoins with the LAN Password and nothing else", function()
+  local world = fullWorld()
+  local computerId = world.bindings["alex-pc"].computer_id
+  local relationshipId
+  for id, childId in pairs(world.nodes["router-home"]:state().relationships or {}) do
+    if childId == computerId then relationshipId = id end
+  end
+  assertTrue(world.nodes["router-home"]:revoke(relationshipId), "revoke")
+  world:settle()
+
+  -- The freed address is the lowest free one again, so the next Computer to
+  -- join takes it -- which is the whole point of releasing it.
+  local rejoined
+  world:pump(function()
+    local value, code, problem = world.nodes["alex-pc"]:joinNetwork({
+      password = LAN_PASSWORD,
+      hostname = "alex-pc",
+      customer_network_name = "home",
+      timeout_ms = 4000,
+    })
+    assert(value, "rejoin failed: " .. tostring(code) .. " " .. tostring(problem))
+    rejoined = value
+    assert(world.nodes["alex-pc"]:connect())
+  end, "alex-pc")
+
+  assertEqual(rejoined.address, "192.168.1.20", "the freed address was handed back out")
+  local answer = world:ask("alex-pc", {
+    customer_network_id = "network-farm",
+    computer_id = world.bindings["harvester"].computer_id,
+  }, "harvester.status", protocol.object({ token = "rejoined" }))
+  assertTrue(answer and answer.payload, "and it is on CraftNet again")
+  assertEqual(get(answer.payload, "token"), "rejoined", "carrying its own answer")
 end)
