@@ -1,9 +1,7 @@
 {
   "name": "craftnet-protocol",
   "version": "0.1.0",
-  "dependencies": {
-    "networking": "^1.0.0"
-  },
+  "dependencies": {},
   "files": {
     "init.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/init.lua",
     "bitops.lua": "https://raw.githubusercontent.com/brian-nunez/computer-craft/main/packages/craftnet-protocol/files/bitops.lua",

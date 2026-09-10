@@ -233,6 +233,64 @@ function engine.shared.tick(instance, input, now, out)
   out:ok({ expired = #expired })
 end
 
+-- effect_result is how the runtime reports what happened when it carried out an
+-- effect. Keeping this explicit is the point of the seam: an engine learns that
+-- a send failed or a snapshot could not be written, instead of a runtime
+-- silently swallowing the problem.
+function engine.shared.effect_result(instance, input, now, out)
+  if input.ok then
+    if input.effect == "send" and input.relationship_id then
+      local link = instance.links[input.relationship_id]
+      if link then link.last_send_ms = now end
+    end
+    return out:ok({ effect = input.effect })
+  end
+
+  instance.lastFailure = {
+    effect = input.effect,
+    code = input.code or "internal_error",
+    message = input.message,
+    at_ms = now,
+  }
+  out:ephemeral("effect_failed", { effect = input.effect, code = instance.lastFailure.code })
+
+  if input.effect == "send" and input.relationship_id then
+    -- A message that could not leave means the relationship is not usable. The
+    -- correlation it belonged to is dropped rather than retried: CraftNet never
+    -- replays an ordinary request on its own.
+    local flow = instance.flows:byCorrelation(input.relationship_id, input.request_id or "")
+    if flow then
+      instance.flows:close(flow.flow_id)
+      out:ephemeral("flow_closed", { flow_id = flow.flow_id, reason = "send_failed" })
+    end
+    local record = instance.transit:byCorrelation(input.relationship_id, input.request_id or "")
+    if record then
+      instance.transit:close(record.flow_id)
+      out:ephemeral("transit_closed", { flow_id = record.flow_id, reason = "send_failed" })
+    end
+  end
+  out:fail(instance.lastFailure.code, input.message)
+end
+
+-- reconcile asks this role's parent whether the configuration it is holding is
+-- still current. A child presents the last parent revision it accepted; the
+-- parent answers with an acknowledgement or a full replacement.
+function engine.shared.reconcile(instance, input, now, out)
+  if not instance.parentRelationshipId then
+    return out:fail("upstream_unavailable", "this role has no parent relationship")
+  end
+  local known = instance.state.parent_revision or 0
+  local requestId = instance:allocateRequestId()
+  instance.transit:open({
+    relationship_id = instance.parentRelationshipId,
+    request_id = requestId,
+    intent = "reconcile",
+  }, now)
+  out:send(instance.parentRelationshipId, "config_request",
+    protocol.object({ known_revision = known }), requestId)
+  out:ok({ known_revision = known, request_id = requestId })
+end
+
 -- message routes a validated protocol message to the role's handler for that
 -- kind. The relationship it arrived on is what says who sent it.
 function engine.shared.message(instance, input, now, out)
@@ -245,13 +303,102 @@ function engine.shared.message(instance, input, now, out)
     return out:fail("invalid_message", "a message input needs a message")
   end
 
+  -- Any authenticated traffic proves the relationship is alive, which is what
+  -- the runtime watches to decide Connectivity State.
+  link.last_seen_ms = now
+
   local byKind = instance.handlers.messages or {}
-  local handler = byKind[message.kind]
+  local handler = byKind[message.kind] or engine.shared.messages[message.kind]
   if not handler then
     return out:fail("invalid_message",
       instance.role .. " does not handle '" .. message.kind .. "'")
   end
   return handler(instance, link, message, now, out, input)
+end
+
+--------------------------------------------------------------------------
+-- Shared messages
+--------------------------------------------------------------------------
+
+-- Reconciliation is identical at every parent-child boundary, so it lives here
+-- once. Each owner wins for the state the authority model assigns to it;
+-- CraftNet never attempts a field-level merge between a parent and a child.
+engine.shared.messages = {}
+
+function engine.shared.messages.heartbeat(instance, link, message, now, out)
+  link.connectivity_state = rawget(message.body, "connectivity_state")
+  link.revision = rawget(message.body, "revision")
+  out:ephemeral("heartbeat_seen", {
+    relationship_id = link.relationship_id, revision = link.revision,
+  })
+  out:ok({ relationship_id = link.relationship_id, revision = link.revision })
+end
+
+function engine.shared.messages.ack(instance, link, message, now, out)
+  local record = instance.transit:byCorrelation(link.relationship_id, message.request_id)
+  if record then instance.transit:close(record.flow_id) end
+  out:ok({ acknowledged = rawget(message.body, "acked_request_id") })
+end
+
+-- config_request comes from a child that wants to know whether its cached
+-- configuration is stale.
+function engine.shared.messages.config_request(instance, link, message, now, out)
+  if link.direction == "parent" then
+    return out:fail("forbidden_operation", "a parent does not ask its child for configuration")
+  end
+  local build = instance.handlers.configurationFor
+  if not build then
+    return out:fail("invalid_message", instance.role .. " configures no children")
+  end
+
+  local configuration, code, problem = build(instance, link)
+  if not configuration then
+    out:replyError(link.relationship_id, message.request_id, code or "name_not_found", problem)
+    return out:fail(code or "name_not_found", problem)
+  end
+
+  local known = rawget(message.body, "known_revision")
+  if known == instance.state.revision then
+    -- Nothing changed, so the child keeps what it has.
+    out:reply(link.relationship_id, "ack", protocol.object({
+      acked_request_id = message.request_id,
+      result_revision = instance.state.revision,
+    }), message.request_id)
+    return out:ok({ current = true, revision = instance.state.revision })
+  end
+
+  out:reply(link.relationship_id, "config_snapshot", protocol.object({
+    revision = instance.state.revision,
+    role = link.role,
+    configuration = configuration,
+  }), message.request_id)
+  out:ok({ current = false, revision = instance.state.revision })
+end
+
+-- config_snapshot is the parent's authoritative replacement. A child applies it
+-- wholesale rather than merging: the parent owns these fields outright.
+function engine.shared.messages.config_snapshot(instance, link, message, now, out)
+  if link.direction ~= "parent" then
+    return out:fail("forbidden_operation", "only a parent may replace configuration")
+  end
+  local apply = instance.handlers.applyConfiguration
+  if not apply then
+    return out:fail("invalid_message", instance.role .. " accepts no configuration")
+  end
+  local record = instance.transit:byCorrelation(link.relationship_id, message.request_id)
+  if record then instance.transit:close(record.flow_id) end
+
+  local body = message.body
+  if rawget(body, "role") ~= instance.role then
+    return out:fail("invalid_message", "that configuration is for another role")
+  end
+
+  local ok, code, problem = apply(instance, rawget(body, "configuration"), out)
+  if not ok then return out:fail(code or "invalid_message", problem) end
+
+  instance.state.parent_revision = rawget(body, "revision")
+  out:durable("configuration_reconciled", { parent_revision = instance.state.parent_revision })
+  out:ok({ parent_revision = instance.state.parent_revision })
 end
 
 engine.Engine = Engine

@@ -19,6 +19,8 @@ local handlers = {
   link_down = shared.link_down,
   tick = shared.tick,
   message = shared.message,
+  effect_result = shared.effect_result,
+  reconcile = shared.reconcile,
 }
 
 local get = rawget
@@ -151,11 +153,21 @@ function handlers.register_router(engine, input, now, out)
     end
   end
 
+  -- A registering router also declares its own LAN configuration. The ISP
+  -- keeps it for topology and for reconciliation, but never becomes its owner:
+  -- the router remains authoritative for every one of those fields.
+  local declared = existing and existing.declared or {}
+  for _, field in ipairs({ "router_address", "dns_address", "pool_first",
+    "pool_last", "lan_operational_channel" }) do
+    if input[field] ~= nil then declared[field] = input[field] end
+  end
+
   state.routers[input.router_id] = {
     router_id = input.router_id,
     customer_network_id = input.customer_network_id,
     customer_network_name = input.customer_network_name,
     provider_address = providerAddress,
+    declared = declared,
   }
   out:durable("router_registered", {
     router_id = input.router_id,
@@ -198,6 +210,53 @@ function handlers.deregister_router(engine, input, now, out)
     }), engine:allocateRequestId())
   end
   out:ok({ router_id = input.router_id, customer_network_id = router.customer_network_id })
+end
+
+--------------------------------------------------------------------------
+-- Reconciliation
+--------------------------------------------------------------------------
+
+-- configurationFor builds the record for one Customer Router. The ISP is
+-- authoritative only for the identity, the name it registered, and the Provider
+-- Address; the LAN fields are echoed back exactly as the router declared them.
+function handlers.configurationFor(engine, link)
+  local router = engine.state.routers[link.id]
+  if not router then
+    return nil, "name_not_found", "that Customer Router is not registered"
+  end
+  local declared = router.declared or {}
+  return protocol.object({
+    customer_network_id = router.customer_network_id,
+    customer_network_name = router.customer_network_name,
+    provider_address = router.provider_address,
+    isp_id = engine.state.isp_id,
+    router_address = declared.router_address or "192.168.1.1",
+    dns_address = declared.dns_address or declared.router_address or "192.168.1.1",
+    pool_first = declared.pool_first or "192.168.1.20",
+    pool_last = declared.pool_last or "192.168.1.39",
+    lan_operational_channel = declared.lan_operational_channel or 0,
+  })
+end
+
+-- applyConfiguration takes what the Central Server owns for this ISP.
+function handlers.applyConfiguration(engine, configuration, out)
+  local state = engine.state
+  local allocations = rawget(configuration, "provider_allocations")
+  if allocations == nil then
+    return nil, "invalid_message", "an ISP configuration needs its Provider Allocations"
+  end
+  state.isp_id = rawget(configuration, "isp_id") or state.isp_id
+  state.isp_name = rawget(configuration, "isp_name") or state.isp_name
+  state.operational_channel = rawget(configuration, "operational_channel") or state.operational_channel
+
+  local ranges = {}
+  for index = 1, #allocations do
+    local entry = rawget(allocations, index)
+    ranges[index] = { first = rawget(entry, "first"), last = rawget(entry, "last") }
+  end
+  state.provider_allocations = ranges
+  out:ephemeral("allocations_replaced", { count = #ranges })
+  return true
 end
 
 --------------------------------------------------------------------------
