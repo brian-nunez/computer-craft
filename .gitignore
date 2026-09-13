@@ -15,9 +15,9 @@ data/
 *.sqlite-wal
 
 # Test and build output
+bin/
 coverage/
 dist/
 external/craftnetd
 external/fixturecheck
 *.test
-

@@ -1,0 +1,8 @@
+.git
+data
+craftnetd
+fixturecheck
+*.db
+*.db-shm
+*.db-wal
+*.test

@@ -35,6 +35,10 @@
 
 * { box-sizing: border-box; }
 
+/* Component display rules are author styles, so they otherwise outrank the
+   browser's built-in handling of the hidden attribute. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--ground);
