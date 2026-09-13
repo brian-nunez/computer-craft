@@ -1,0 +1,23 @@
+services:
+  craftnetd:
+    build:
+      context: ./external
+      dockerfile: Dockerfile
+    image: craftnetd:local
+    restart: unless-stopped
+    init: true
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    cpus: 0.5
+    mem_limit: 256m
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3

@@ -62,16 +62,33 @@ Behind TLS, add `-secure-cookies`. The dashboard is at the address it prints.
 ### Let the Central Server reach it
 
 The Central Server opens the Gateway with CC:Tweaked's HTTP API, so that has to
-be on and the host has to be allowed. In the CC:Tweaked server config:
+be on and the host has to be allowed. CC:Tweaked may place its server config at
+`saves/WORLD/serverconfig/computercraft-server.toml` or, on current Fabric
+builds, at `config/computercraft-server.toml` in the game directory. For a
+Prism Launcher instance, use **Folder** from the instance menu, then open
+`minecraft/config/computercraft-server.toml` (some instances name the game
+directory `.minecraft` instead).
+
+In that file, confirm HTTP and WebSockets are enabled:
 
 ```toml
 [http]
 enabled = true
+websocket_enabled = true
+```
 
+Add a rule for the External Application's exact host **before** the existing
+`host = "$private"` deny rule. CC:Tweaked evaluates rules in order, so adding it
+after that rule does not permit the connection:
+
+```toml
 [[http.rules]]
 host = "YOUR-HOST"
 action = "allow"
 ```
+
+Leave the `$private` deny rule in place so other private services remain
+unreachable. Save the file while Minecraft is closed, then restart it.
 
 If the API is off or the host is blocked, everything in world still works —
 addressing, names, routing, NAT, Network Status. External calls give

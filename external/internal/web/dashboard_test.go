@@ -145,6 +145,24 @@ func TestTheDashboardIsServedFromTheBinary(t *testing.T) {
 	}
 }
 
+// Author styles outrank the browser's built-in hidden rule. The sign-in panel
+// has its own display declaration, so the dashboard must explicitly preserve
+// hidden as the state transition after a successful sign-in.
+func TestDashboardStylesPreserveHiddenState(t *testing.T) {
+	held := newHarness(t)
+	response, err := http.Get(held.server.URL + "/assets/dashboard.css")
+	if err != nil {
+		t.Fatalf("get dashboard styles: %v", err)
+	}
+	body, _ := io.ReadAll(response.Body)
+	response.Body.Close()
+
+	styles := string(body)
+	if !strings.Contains(styles, "[hidden]") || !strings.Contains(styles, "display: none !important") {
+		t.Fatal("dashboard styles allow component display rules to override hidden state")
+	}
+}
+
 // The page may talk to itself and to nothing else, so a compromised dependency
 // has nowhere to send what it reads. There are no dependencies either.
 func TestTheDashboardDeclaresWhatItMayTalkTo(t *testing.T) {
